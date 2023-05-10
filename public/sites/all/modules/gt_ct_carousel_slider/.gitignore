@@ -1,0 +1,12 @@
+# Ignore MacOS DS_store files
+styles/.DS_store
+*.DS_store
+
+# Phpstorm stuff
+.idea
+
+# Sass caches
+.sass-cache
+
+# Netbeans files
+*/nbproject/*

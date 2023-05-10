@@ -1,0 +1,1258 @@
+<?php
+/**
+* Georgia Institute of Technology Mercury Feed Reader
+*
+* This file contains functions used to read and display Mercury feeds (hg.gatech.edu)
+*
+* @author Office of Communications and Marketing <web@comm.gatech.edu>
+*
+* @todo Check blocks.
+* @todo Remove cache_lite checks from hg_reader.install.
+* @todo Clean up ics functionality.
+*
+* @todo Handle situations in which previously published items are unpublished.
+*/
+
+define('READER_VERSION', '7.x-2.10');
+define('HG_URL', 'https://hg.gatech.edu');
+define('HG_IMAGE_NOT_FOUND', 113741);
+
+/**
+ * Load all public Field API functions. Drupal currently has no
+ * mechanism for auto-loading core APIs, so we have to load them on
+ * every page request.
+ */
+require_once drupal_get_path('module', 'hg_reader') . '/inc/hg_reader.cache.inc';
+require_once drupal_get_path('module', 'hg_reader') . '/inc/hg_reader.node.inc';
+require_once drupal_get_path('module', 'hg_reader') . '/inc/hg_reader.block.inc';
+
+/**
+ * Return appropriate field as comparator for hg_reader_sort_feed().
+ *
+ * @param $item
+ * @return mixed
+ */
+function hg_reader_comparator($item) {
+  switch ($item['type']) {
+    case 'news':
+      return $item['dateline'];
+      break;
+    case 'event':
+      return $item['start'];
+      break;
+    case 'hgTechInTheNews':
+      return $item['article_dateline'];
+      break;
+  }
+}
+
+/**
+ * Helper function for decoding base64-encoded arrays, recursively
+ *
+ * @param $item
+ */
+function hg_reader_decode(&$item) {
+  if (is_array($item)) {
+    if (array_key_exists('format', $item) && array_key_exists('value', $item)) {
+      if ($item['format'] == 'base64') {
+        $item = base64_decode($item['value']);
+      } else {
+        $item = $item['value'];
+      }
+    } else {
+      foreach ($item as &$subitem) {
+        hg_reader_decode($subitem);
+      }
+    }
+  }
+}
+
+/**
+ * Form for configuring node-associated feeds.
+ *
+ * @return mixed
+ */
+function hg_reader_feed_form() {
+  drupal_add_css(drupal_get_path('module', 'hg_reader') . '/hg_reader.css');
+  drupal_add_js(drupal_get_path('module', 'hg_reader') . '/hg_reader.js');
+
+  $form = array();
+  $feed = hg_reader_get_feed(arg(1));
+
+  // FEED SETTINGS
+
+  $form['feed'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Feed settings'),
+  );
+  $form['feed']['feed_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Feed ID'),
+    '#description' => 'This is the five- or six-digit ID in the URL of your feed in Mercury. You may enter multiple feed IDs, separating them with commas.',
+    '#default_value' => isset($feed['hg_fid']) ? $feed['hg_fid'] : '',
+    '#size' => 20,
+    '#maxlength' => 255,
+  );
+  $form['feed']['feed_item_count'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Maximum items'),
+    '#description' => 'Enter a the maximum number of items you want the feed to display, or 0 for unlimited.',
+    '#default_value' => isset($feed['maximum']) ? $feed['maximum'] : 0,
+    '#size' => 20,
+    '#maxlength' => 8,
+  );
+  $form['feed']['feed_classes'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Feed classes'),
+    '#description' => 'Feed classes are used to generate template suggestions and css classes specific to this feed. Separate classes with spaces.',
+    '#default_value' => isset($feed['classes']) ? implode(' ', $feed['classes']) : '',
+    '#size' => 40,
+    '#maxlength' => 255,
+  );
+  $form['feed']['feed_parent'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Parent URL'),
+    '#description' => 'Specify a URL serve as a parent to Mercury items in this block. E.g. <em>news</em>.',
+    '#default_value' => isset($feed['parent']) ? $feed['parent'] : '',
+    '#size' => 40,
+    '#maxlength' => 255,
+  );
+  $form['feed']['feed_page'] = array(
+    '#type' => 'checkboxes',
+    '#description' => 'Check this box if you want a paged feed, with next and prev links.',
+    '#options' => array(
+      1 => t('Use a pager'),
+    ),
+    '#default_value' => isset($feed['page']) ? array($feed['page']) : array(0),
+  );
+  $form['feed']['feed_sort'] = array(
+    '#type' => 'checkboxes',
+    '#description' => 'Check this box if you wish the feed to appear in reverse order.',
+    '#options' => array(
+      1 => t('Reverse sort'),
+    ),
+    '#default_value' => isset($feed['sort']) ? array($feed['sort']) : array(0),
+  );
+
+
+  // FEED FIELDS
+
+  $form['feed_fields'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Teaser field selections'),
+    '#description' => t('Show the selected fields in lists of teasers.'),
+  );
+
+  $feed_defaults = hg_reader_field_defaults('defaults_options', 'feeds');
+
+  $form['feed_fields']['feed_fields_events'] = array(
+    '#type' => 'checkboxes',
+    '#title' => 'Event fields',
+    '#default_value' => isset($feed['feed_fields_events']) ? $feed['feed_fields_events'] : $feed_defaults['events'],
+  );
+
+  $form['feed_fields']['feed_fields_news'] = array(
+    '#type' => 'checkboxes',
+    '#title' => 'News fields',
+    '#default_value' => isset($feed['feed_fields_news']) ? $feed['feed_fields_news'] : $feed_defaults['news'],
+  );
+
+  $form['feed_fields']['feed_fields_external_news'] = array(
+    '#type' => 'checkboxes',
+    '#title' => 'External news fields',
+    '#default_value' => isset($feed['feed_fields_external_news']) ? $feed['feed_fields_external_news'] : $feed_defaults['external_news'],
+  );
+
+  $feed_fields = hg_reader_field_defaults('fieldnames', 'feeds');
+  foreach ($feed_fields as $type => $options) {
+    $form['feed_fields']['feed_fields_' . $type]['#options'] = $options;
+  }
+
+
+  // ITEM FIELDS
+
+  $form['item_fields'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Full view field selections'),
+    '#description' => t('Show the selected fields in full views of individual items.'),
+  );
+
+  // Only show scrim and buttons if the item field defaults have not been overridden for this feed.
+  // Note: the scrim is used to fade the field options and make them inaccessible until the user explicitly elects to
+  // override the defaults.
+  if (!isset($feed['item_fields_override']) || !$feed['item_fields_override']) {
+    $form['item_fields']['scrim'] = array(
+      '#markup' => '<div id="scrim"></div>',
+    );
+
+    $form['item_fields']['edit'] = array(
+      '#markup' => '
+        <div id="item-fields-buttons">
+          <button class="hidden" id="item-fields-edit-all">Edit (all feeds)</button><br />
+          <button class="hidden" id="item-fields-override">Edit this feed (override)</button>
+        </div>',
+    );
+  }
+
+  $feed_defaults = hg_reader_field_defaults('defaults_options', 'items');
+
+  $form['item_fields']['item_fields_events'] = array(
+    '#type' => 'checkboxes',
+    '#title' => 'Event fields',
+    '#default_value' => isset($feed['item_fields_events']) ? $feed['item_fields_events'] : variable_get('hg_events_defaults', $feed_defaults['events']),
+  );
+
+  $form['item_fields']['item_fields_news'] = array(
+    '#type' => 'checkboxes',
+    '#title' => 'News fields',
+    '#default_value' => isset($feed['item_fields_news']) ? $feed['item_fields_news'] : variable_get('hg_news_defaults', $feed_defaults['news']),
+  );
+
+  $feed_fields = hg_reader_field_defaults('fieldnames', 'items');
+  foreach ($feed_fields as $type => $options) {
+    $form['item_fields']['item_fields_' . $type]['#options'] = $options;
+  }
+
+
+  // OTHER STUFF
+
+  // Flag indicating whether the default item fields have been overridden.
+  $form['override'] = array(
+    '#type' => 'hidden',
+    '#default_value' => isset($feed['item_fields_override']) && $feed['item_fields_override'] == 1 ? isset($feed['item_fields_override']) : FALSE,
+  );
+
+  // Feed ID, if the feed is being edited rather than newly submitted.
+  $form['fid'] = array(
+    '#type' => 'value',
+    '#default_value' => isset($feed['fid']) ? : '',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#weight' => 10,
+    '#value' => t('Save changes')
+  );
+
+  return $form;
+}
+
+/**
+ * Callback for insertion of new feed.
+ *
+ * @param $nid
+ * @param $form
+ * @param $form_state
+ */
+function hg_reader_feed_insert($nid, $form, $form_state) {
+  // save the feed
+  $feed = db_insert('hg_feeds');
+  $feed->fields(array(
+    'hg_fid' => $form_state['values']['feed_id'],
+    'maximum' => $form_state['values']['feed_item_count'],
+    'parent' => $form_state['values']['feed_parent'],
+    'page' => $form_state['values']['feed_page'],
+    'sort' => $form_state['values']['feed_sort'],
+    'feed_fields' => hg_reader_flatten_fields($form_state, 'feed_fields'),
+    'item_fields' => $form_state['values']['override'] ? hg_reader_flatten_fields($form_state, 'item_fields') : '',
+    'item_fields_override' => $form_state['values']['override'] ? 1 : 0,
+  ));
+  $fid = $feed->execute();
+
+  // save the node info
+  $feednode = db_insert('hg_feeds_nodes');
+  $feednode->fields(array(
+    'fid' => $fid,
+    'nid' => $nid,
+  ))
+    ->execute();
+
+  // save the feed classes
+  $classes = array_unique(explode(' ', $form_state['values']['feed_classes']));
+  foreach ($classes as $class) {
+    db_insert('hg_feeds_classes')
+      ->fields(array(
+        'fid' => $fid,
+        'class' => $class,
+      ))
+      ->execute();
+  }
+
+  drupal_set_message('Mercury settings saved.');
+}
+
+/**
+ * Submit handler for Mercury form
+ *
+ * @param $form
+ * @param $form_state
+ */
+function hg_reader_feed_form_submit($form, $form_state) {
+  // Are we updating or inserting?
+  if ($form_state['values']['fid'] == '') {
+    hg_reader_feed_insert(arg(1), $form, $form_state);
+  } else {
+    hg_reader_feed_update(arg(1), $form, $form_state);
+  }
+}
+
+/**
+ * Callback for updating an existing feed.
+ */
+function hg_reader_feed_update($nid, $form, $form_state) {
+  $feed_original = hg_reader_get_feed($nid);
+
+  // update the feed
+  db_update('hg_feeds')
+    ->fields(array(
+      'hg_fid' => $form_state['values']['feed_id'],
+      'maximum' => $form_state['values']['feed_item_count'],
+      'parent' => $form_state['values']['feed_parent'],
+      'page' => $form_state['values']['feed_page'],
+      'sort' => $form_state['values']['feed_sort'],
+      'feed_fields' => hg_reader_flatten_fields($form_state, 'feed_fields'),
+      'item_fields' => $form_state['values']['override'] ? hg_reader_flatten_fields($form_state, 'item_fields') : '',
+      'item_fields_override' => $form_state['values']['override'] ? 1 : 0,
+    ))
+    ->condition('fid', $feed_original['fid'])
+    ->execute();
+
+  // delete the old classes
+  db_delete('hg_feeds_classes')
+    ->condition('fid', $feed_original['fid'])
+    ->execute();
+
+  // insert the new classes
+  $classes = array_unique(explode(' ', $form_state['values']['feed_classes']));
+  foreach ($classes as $class) {
+    db_insert('hg_feeds_classes')
+      ->fields(array(
+        'fid' => $feed_original['fid'],
+        'class' => $class,
+      ))
+      ->execute();
+  }
+
+  drupal_set_message('Mercury settings updated.');
+}
+
+/**
+ * Return a list of all user-selectable fields on a per content-type basis. Keys are field names, values are flags
+ * indicating whether or not they are defaults for feeds, items, or both.
+ *
+ * @param string $mode
+ * @return array
+ */
+function hg_reader_field_defaults($mode = 'fieldnames', $type = 'feeds') {
+  $fields = hg_reader_fields($type);
+
+  switch ($mode) {
+    case 'fieldnames':
+      $rekeyed = array();
+      foreach (array('events', 'news', 'external_news') as $type) {
+        if (!isset($fields[$type])) { continue; }
+        foreach ($fields[$type] as $key => $value) {
+          $rekeyed[$type][strtolower($key)] = $key;
+        }
+      }
+      return $rekeyed;
+    case 'feed_defaults':
+      // Return an array of field names to be used.
+      foreach ($fields as $type => $values) {
+        $defaults['feed_fields_' . $type] = array_keys(array_filter(
+          $fields[$type],
+          function($field) {
+            return $field ? TRUE : FALSE;
+          }
+        ));
+      }
+      return $defaults;
+    case 'item_defaults':
+      // Return an array of field names to be used.
+      $defaults = array();
+      foreach ($fields as $type => $values) {
+        $settings = variable_get('hg_' . $type . '_defaults');
+        if (!$settings) {
+          $factory = hg_reader_field_defaults('defaults_options', 'items');
+          if (isset($factory[$type])) {
+            $settings = $factory[$type];
+          }
+        }
+        $i = 0;
+        foreach ($fields[$type] as $field => $value) {
+          if (isset($settings[strtolower($field)]) && $settings[strtolower($field)]) {
+            $defaults['item_fields_' . $type][] = $field;
+          }
+          $i++;
+        }
+      }
+      return $defaults;
+    case 'defaults_options':
+      $defaults = array();
+      foreach (array('events', 'news', 'external_news') as $type) {
+        if (!isset($fields[$type])) { continue; }
+        foreach ($fields[$type] as $key => $value) {
+          $defaults[$type][strtolower($key)] = strtolower($key);
+        }
+      }
+      return $defaults;
+  }
+}
+
+/**
+ * Returns a list of available item and feed fields and their default implementation in various Mercury content types.
+ *
+ * @param $type
+ * @return array
+ */
+function hg_reader_fields($type) {
+  switch ($type) {
+    case 'feeds':
+      return array(
+        'events' => array(
+          t('Summary sentence') => FALSE,
+          t('Summary')          => TRUE,
+          t('Location')         => TRUE,
+          t('Location phone')   => FALSE,
+          t('Location URL')     => FALSE,
+          t('Location email')   => FALSE,
+          t('Fee')              => FALSE,
+          t('Extras')           => FALSE,
+        ),
+        'news' => array(
+          t('Subtitle')         => FALSE,
+          t('Summary sentence') => FALSE,
+          t('Summary')          => TRUE,
+          t('Dateline')         => TRUE,
+          t('Location')         => FALSE,
+          t('Thumbnail image')  => TRUE,
+        ),
+        'external_news' => array(
+          t('Publication')      => TRUE,
+          t('Dateline')         => TRUE,
+          t('Thumbnail image')  => TRUE,
+        ),
+      );
+
+    case 'items':
+      return array(
+        'events' => array(
+          t('Location')         => TRUE,
+          t('Location phone')   => TRUE,
+          t('Location URL')     => TRUE,
+          t('Location email')   => TRUE,
+          t('Fee')              => TRUE,
+          t('Extras')           => TRUE,
+          t('Media')            => TRUE,
+          t('Contact')          => TRUE,
+          t('Related files')    => TRUE,
+          t('Related links')    => TRUE,
+        ),
+        'news' => array(
+          t('Subtitle')         => TRUE,
+          t('Dateline')         => TRUE,
+          t('Location')         => TRUE,
+          t('Media')            => TRUE,
+          t('Contact')          => TRUE,
+          t('Related files')    => TRUE,
+          t('Related links')    => TRUE,
+        ),
+      );
+  }
+}
+
+/**
+ * Check whether file exists, return form error if not.
+ *
+ * @param $form_element
+ * @return mixed
+ */
+function hg_reader_file_check_exists($form_element) {
+  // Check if file exists.
+  if (!file_exists($form_element['#value'])) {
+    if ($form_element['#parents'][0]) {
+      form_set_error($form_element['#parents'][0], t('The file %file does not exist.', array('%file' => $form_element['#value'])));
+    }
+  }
+  return $form_element;
+}
+
+/**
+ * Sift through all the fields in the Mercury form and return a serialization of
+ * those that begin with "fields_"
+ * @param $form_state
+ * @return array
+ */
+function hg_reader_flatten_fields($form_state, $prefix) {
+  $fields = array();
+  foreach ($form_state['input'] as $key => $value) {
+    if (strpos($key, $prefix) !== FALSE) {
+      $fields[$key] = array_values(array_filter($form_state['input'][$key], 'strlen'));
+    }
+  }
+  return serialize($fields);
+}
+
+/**
+ * Pull the feed particulars out of the database.
+ *
+ * @param $nid
+ * @return mixed
+ */
+function hg_reader_get_feed($nid) {
+  $query = db_select('hg_feeds', 'hg');
+  $query->join('hg_feeds_nodes', 'hgn', 'hg.fid = hgn.fid');
+  $query->condition('hgn.nid', $nid);
+  $query->fields('hg');
+  $result = $query->execute();
+  $feed = $result->fetchAssoc();
+
+  $result = db_select('hg_feeds_classes', 'hgc')
+    ->condition('fid', $feed['fid'])
+    ->fields('hgc', array('class'))
+    ->execute();
+  $feed['classes'] = $result->fetchCol();
+
+  if (isset($feed['feed_fields'])) { $feed = array_merge($feed, unserialize($feed['feed_fields'])); }
+  if (isset($feed['item_fields_override']) && $feed['item_fields_override'] && isset($feed['item_fields']) && $feed['item_fields'] != '') { $feed = array_merge($feed, unserialize($feed['item_fields'])); }
+
+  return $feed;
+}
+
+/**
+ * Get the fid for a feed.
+ *
+ * @param $nid
+ * @param string $table
+ * @param string $field
+ * @return mixed
+ */
+function hg_reader_get_feed_fid($nid, $table = 'hg_feeds_nodes', $field = 'nid') {
+  $fid = db_select($table, 'hg')
+    ->fields('hg', array('fid'))
+    ->condition($field, $nid)
+    ->execute()
+    ->fetchField();
+  return $fid;
+}
+
+/**
+ * Barf up JSON representations of an arbitrary Mercury node.
+ *
+ * @param int $id
+ *   A Mercury ID
+ *
+ * @return string
+ *   A JSON representation of the node title and summary.
+ */
+function hg_reader_get_feature_json($id) {
+  $filter_date = date('Ymd');
+  $feed_attrs = array(
+    'xslt' => variable_get('hg_item_xsl', drupal_get_path('module', 'hg_reader') . '/xsl/hgSerializedItem.xsl'),
+    'cacheTime' => 3600,
+    'xslParams' => array('filter_string'=>$filter_date, 'index'=> 1)
+  );
+
+  $hg_item = unserialize(array_pop(hg_reader_reader($id, $feed_attrs, 'json')));
+
+  $out['title'] = base64_decode($hg_item['title']['value']);
+  $out['summary'] = base64_decode($hg_item['summary']['value']);
+
+  return drupal_json_output($out);
+}
+
+/**
+ * Implementation of hook_help.
+ */
+function hg_reader_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#hg_reader':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The Mercury Reader module provides a turnkey solution for retrieving Mercury content and displaying it on client sites. It also provides an API (documented in hg_reader.api.php) for sites retrieving Mercury content by other methods.') . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Feed pages') . '</dt>';
+      $output .= '<dd>' . t('Mercury feeds can be added to pages via a two-step process:');
+      $output .= '<ol>';
+      $output .= '<li>' . t('Edit the content-type you want to use for displaying Mercury feeds. Click the Mercury settings fieldset and check "Allow Mercury feeds to be used on pages of this type.') . '</li>';
+      $output .= '<li>' . t('Create a node of the Mercury-enabled content type. After saving the new node, click the Mercury tab. Enter the ID of the feed (the 5- or 6-digit number in the URL for the feed in Mercury) in the <strong>Feed ID</strong> box. Enter a value for <strong>Maximum items</strong> if you wish to limit the length of the feed. Enter a CSS class in the <strong>Feed classes</strong> box if desired, and (if you are using the Pathauto module) a <strong>Parent URL</strong> for the items within the feed.') . '</li>';
+      $output .= '</ol>';
+      $output .= '</dd>';
+      $output .= '<dt>' . t('Feed blocks') . '</dt>';
+      $output .= '<dd>' . t('Mercury feed blocks can be created just as easily as pages. Just click "Add Mercury block" on the block admin page and fill the forms out the same as in the <strong>Feed pages</strong> section above.') . '</dd>';
+      $output .= '</dl>';
+      $output .= '<h3>' . t('Additional notes') . '</h3>';
+      $output .= '<p>'  . t('The Mercury Reader will cache all feeds and items for one hour, and images for twenty-four hours. In the event that a fresh copy is desired, caches may be cleard by clicking the flush cache link on any given feed or item, or by flushing all caches from the <a href="@performance">performance</a> page. Note, however, that if Mercury is offline or the item cannot be refreshed, the cached copy will be retained.', array('@performance' => url('admin/config/development/performance'))) . '</p>';
+      $output .= '<h3>' . t('Error reference') . '</h3>';
+      $output .= '<p>' . t('In the course of regular Mercury Reader use, you may run afoul of the following errors. In most cases they are indicative of problems in the Mercury server, and the Reader is equipped to work around them to a great extent. However, they are detailed here for both peace of mind as well as for troubleshooting purposes.') . '<p>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Expired feed/item pulled from cache.') . '<dt>';
+      $output .= '<dd>' . t('This indicates that although the cached copy of the item or feed has expired, it is being used anyway. This is typically due to a Mercury outage and should pass in due time.') . '</dd>';
+      $output .= '<dt>' . t('Mercury error: The feed/item could not be retrieved.') . '</dt>';
+      $output .= '<dd>' . t('This indicates that the feed or item could not be retrieved from Mercury and neither could it be retrieved from the cache, and thus cannot be displayed. This is usually due to a Mercury outage, but may also be caused by an invalid Mercury ID. You are encouraged to check the feed or item in Mercury to verify that it is correct.') . '</dd>';
+      $output .= '<dt>' . t('Mercury error: The feed/item was not found.') . '</dt>';
+      $output .= '<dd>' . t('This is an unambiguous sign that the Mercury ID you\'ve supplied for the feed or item is incorrect.') . '</dd>';
+      $output .= '<dt>' . t('Mercury error: Access to the feed/item is restricted.') . '</dt>';
+      $output .= '<dd>' . t('This indicates that the Mercury ID specified points to an item in Mercury that is restricted from public view. Since it is exceedingly rare that Mercury content should be rendered inaccessible, this is usually a good sign that the Mercury ID you\ve supplied is incorrect.') . '</dd>';
+      $output .= '<dt>' . t('Mercury error: This feed/item is unpublished.') . '</dt>';
+      $output .= '<dd>' . t('This indicates that the Mercury item specified is not published and is therefore inaccessible to the public. Check the workflow state of the item on Mercury to correct this.') . '</dd>';
+      $output .= '<dt>' . t('Mercury error: Mercury is offline.') . '</dt>';
+      $output .= '<dd>' . t('Check <a href="@mercury">hg.gatech.edu</a> for further information. Most likely it will be back online within a few minutes.', array('@mercury' => 'http://hg.gatech.edu')) . '</dd>';
+      $output .= '<dt>' . t('Mercury error: Operation timed out. You may want to consider increasing the Mercury Reader\'s curl timeout value.') . '</dt>';
+      $output .= '<dd>' . t('This generally occurs when you have specified a Mercury feed that is too large to read within the default timeout of 10 seconds, though it may also be caused by network congestion or temporary issues with the Mercury server. If you know what you are doing, you can follow the link in the error and increase the timeout value, though be aware that this can cause serious performance issues not only with your site but with Mercury itself. A better solution, if the problem is chronic, is to limit the number of items in the feed you have specified.') . '</dd>';
+      $output .= '<dt>' . t('Mercury error: Mercury is not responding.') . '<dt>';
+      $output .= '<dd>' . t('This usually indicates that Mercury server is offline. Most likely it will be back online within a few minutes.', array('@mercury' => 'http://hg.gatech.edu')) . '</dd>';
+      $output .= '</dl>';
+      $output .= '<p>' . t('Other Mercury errors are possible, but most of them should pass within a few minutes. In the event of a chronic, undocumented error, email <a href="@webteam">webteam@gatech.edu</a>.', array('@webteam' => 'mailto:webteam@gatech.edu')) . '</p>';
+      return $output;
+  }
+}
+
+/**
+ * This function outputs a .ics file for an event
+ */
+function hg_reader_ics($nid) {
+  if (!$nid) {
+    hg_reader_message('Node ID is required for ICS file.', 'error');
+    $returnpath = $_SERVER['HTTP_REFERER'] == '' ? 'events' : $_SERVER['HTTP_REFERER'];
+    drupal_goto($returnpath);
+  } else {
+
+    $attr = array('xslt' => drupal_get_path('module', 'hg_reader') . '/xsl/hgSerializedItem.xsl', 'cacheTime' => 0);
+    $serialized = hg_reader_reader($nid, $attr, 'node');
+    $ics = unserialize($serialized[1]);
+    if (!empty($ics)) :
+
+      drupal_add_http_header('Content-Type', 'text/calendar; charset=utf-8;');
+      drupal_add_http_header('Content-Disposition', 'attachment; filename="' . $nid . '.ics"; ');
+
+      print "BEGIN:VCALENDAR\n";
+      print "PRODID:-//Calendar//Calendar Event//EN\n";
+      print "CALSCALE:GREGORIAN\n";
+      print "METHOD:PUBLISH\n";
+      print "DTSTAMP:" . date('Ymd\THis',strtotime($ics['times'][0]['startdate']['value'])) . "\n";
+      for($i = 0; $i < count($ics['times']); $i++) {
+        print "BEGIN:VEVENT\n";
+        print "DTSTART:" . date('Ymd\THis',strtotime($ics['times'][$i]['startdate']['value'])) . "\n";
+        print "DTEND:" . date('Ymd\THis',strtotime($ics['times'][$i]['stopdate']['value'])) . "\n";
+        print "SUMMARY:" . base64_decode($ics['title']['value']) . "\n";
+        print "DESCRIPTION:" . base64_decode($ics['sentence']['value']) . "\n";
+        print "LOCATION:" . base64_decode($ics['location']['value']) . "\n";
+        print "SEQUENCE:0\n";
+        print "END:VEVENT\n";
+      }
+      print "END:VCALENDAR";
+      exit();
+
+    else :
+      hg_reader_message('There was a problem getting the ICS file.', 'error');
+      $returnpath = $_SERVER['HTTP_REFERER'] == '' ? 'events' : $_SERVER['HTTP_REFERER'];
+      drupal_goto($returnpath);
+    endif;
+
+  }
+}
+
+/**
+ * Implementation of hook_menu:
+ *
+ * admin/config/hg                 - Administrative settings
+ * hg_reader/image/%               - Return image indicated by id -- DEPRECATED
+ * hg_reader/file/%                - Return file indicated by id
+ * hg_reader/ics/%                 - Return ICS file indicated by id
+ * hg_reader/item/%                - Return formatted item indicated by id
+ * admin/structure/block/add-hg    - Add a new hg block
+ * admin/structure/block/delete-hg - Delete an hg block
+ * admin/structure/block/delete-hg - Delete an hg block
+ * hg/item/json                    - Return json representation of an item indicated by id
+ * node/%/flush-cache              - Invalidate cache for feed indicated by id
+ * hg/item/%/flush-cache           - Invalidate cache for item indicated by id
+ *
+ * @return array
+ */
+function hg_reader_menu() {
+  $items = array();
+
+  $items['admin/config/hg'] = array(
+    'title' => 'Mercury',
+    'description' => 'Configure any installed Mercury modules.',
+    'page callback' => 'system_admin_menu_block_page',
+    'access arguments' => array('access administration pages'),
+    'file' => 'system.admin.inc',
+    'file path' => drupal_get_path('module', 'system'),
+  );
+  $items['admin/config/hg/hg-reader'] = array(
+    'title' => 'Hg Reader',
+    'description' => 'Configure Mercury file locations and curl parameters.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hg_reader_settings'),
+    'access arguments' => array('administer mercury reader'),
+    'file' => 'inc/hg_reader.admin.inc',
+  );
+  $items['admin/structure/block/add-hg'] = array(
+    'title' => 'Add Mercury block',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hg_reader_add_block_form'),
+    'access arguments' => array('administer blocks'),
+    'type' => MENU_LOCAL_ACTION,
+  );
+  $items['admin/structure/hg-block/manage/block/%/delete'] = array(
+    'title' => 'Delete menu block',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hg_reader_block_delete', 5),
+    'access arguments' => array('administer blocks'),
+    'type' => MENU_CALLBACK,
+  );
+  // Deprecated
+  $items['hg/image/%'] = array(
+    'page callback' => 'hg_reader_get_file',
+    'access arguments' => array('access content'),
+    'page arguments' => array(1,2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['hg/file/%'] = array(
+    'page callback' => 'hg_reader_get_file',
+    'access arguments' => array('access content'),
+    'page arguments' => array(1,2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['hg/ics/%'] = array(
+    'page callback' => 'hg_reader_ics',
+    'access arguments' => array('access content'),
+    'page arguments' => array(2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['hg/item/%'] = array(
+    'page callback' => 'hg_reader_item',
+    'access arguments' => array('access content'),
+    'page arguments' => array(2),
+    'type' => MENU_CALLBACK,
+  );
+  $items['hg/item/json'] = array(
+    'page callback' => 'hg_reader_get_feature_json',
+    'access arguments' => array('access content'),
+    'page arguments' => array(3),
+    'type' => MENU_CALLBACK,
+  );
+  $items['node/%/flush-cache'] = array(
+    'title' => 'Flush this feed from the cache.',
+    'page callback' => 'hg_reader_expire_caches',
+    'page arguments' => array(1,0),
+    'access callback' => 'hg_reader_requires_cache_flush',
+    'access arguments' => array(1,'administer mercury reader'),
+    'type' => MENU_LOCAL_ACTION,
+    'weight' => 15,
+  );
+  $items['hg/item/%/flush-cache'] = array(
+    'title' => 'Flush this item from the cache.',
+    'page callback' => 'hg_reader_expire_caches',
+    'page arguments' => array(2,0,1),
+    'access arguments' => array('administer mercury reader'),
+    'type' => MENU_LOCAL_ACTION,
+    'weight' => 15,
+  );
+  $items['node/%node/hg'] = array(
+    'type' => MENU_LOCAL_TASK,
+    'title' => 'Mercury',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('hg_reader_feed_form'),
+    'access callback' => 'hg_reader_has_mercury_fields',
+    'access arguments' => array(1, 'manage mercury nodes'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function hg_reader_permission() {
+  return array(
+    'administer mercury reader' => array(
+      'title' => t('Administer Mercury Reader'),
+    ),
+    'manage mercury nodes' => array(
+      'title' => t('Manage Mercury Nodes'),
+    ),
+  );
+}
+
+/**
+ * Check whether cache flush action is merited, so we don't spam the whole site.
+ */
+function hg_reader_requires_cache_flush($nid, $permission) {
+  $node = node_load($nid);
+  return user_access($permission) && $node->feed_id;
+}
+
+/**
+ * Date helper function for xsl documents
+ */
+function hg_reader_XSLDateTimeXfer($type, $date) {
+  switch($type) {
+    // returns day digit w/o leading zeros
+    case 'dayDigitShort':
+      $day = date('j',strtotime($date));
+      break;
+    // returns day digit w/ leading zeros
+    case 'dayDigitLong':
+      $day = date('d',strtotime($date));
+      break;
+    // returns short day name (Mon,Tue,etc.)
+    case 'dayStringShort':
+      $day = date('D',strtotime($date));
+      break;
+    // returns long day name (Monday,Tuesday,etc.)
+    case 'dayStringLong':
+      $day = date('l',strtotime($date));
+      break;
+    // returns month digit w/o leading zeros
+    case 'monthDigitShort':
+      $day = date('n',strtotime($date));
+      break;
+    // returns month digit w/ leading zeros
+    case 'monthDigitLong':
+      $day = date('m',strtotime($date));
+      break;
+    // returns short month name (Jan,Feb,etc.)
+    case 'monthStringShort':
+      $day = date('M',strtotime($date));
+      break;
+    // returns long month name (January,February,etc.)
+    case 'monthStringLong':
+      $day = date('F',strtotime($date));
+      break;
+    //returns 2-digit year
+    case 'yearShort':
+      $day = date('y',strtotime($date));
+      break;
+    //returns 4-digit year
+    case 'yearLong':
+      $day = date('Y',strtotime($date));
+      break;
+    // returns format: 2010-01-01
+    case 'fullDateDigit':
+      $day = date('Y-m-d',strtotime($date));
+      break;
+    // returns format: January 1, 2010
+    case 'fullDateString':
+      $day = date('F j, Y',strtotime($date));
+      break;
+    // returns format: HH:MM:SS
+    case 'fullTimeDigit':
+      $day = date('H:i:s',strtotime($date));
+      break;
+    // returns 12-hour format: 1:00 PM
+    case 'fullTimeString':
+      $day = date('g:i a',strtotime($date));
+      break;
+    // returns Unix time
+    case 'unixFormat':
+      $day = mktime(date('H',strtotime($date)),date('i',strtotime($date)),date('s',strtotime($date)),date('n',strtotime($date)),date('j',strtotime($date)),date('Y',strtotime($date)));
+      break;
+  }
+  return $day;
+}
+
+/**
+ * Provides a themeable item page.
+ *
+ * @param $nid
+ * @return string
+ */
+function hg_reader_item($nid) {
+  // Start by clearing any persistent Mercury errors.
+  drupal_get_messages();
+
+  drupal_add_css(drupal_get_path('module', 'hg_reader') . '/hg_reader.css');
+
+  $filter_date = date('Ymd');
+  $feed_attrs = array(
+       'xslt' => variable_get('hg_item_xsl', drupal_get_path('module', 'hg_reader') . '/xsl/hgSerializedItem.xsl'),
+       'cacheTime' => 3600,
+       'xslParams' => array('filter_string'=>$filter_date, 'index'=> 1)
+  );
+
+  if ($data = hg_reader_reader($nid, $feed_attrs, 'item')) {
+    $node = unserialize(array_pop($data));
+
+    // Get field settings as specified in the parent node, or the defaults if they haven't been overridden.
+    $parent_path = drupal_lookup_path('source', substr($_SERVER['HTTP_REFERER'], strlen($_SERVER['SERVER_NAME']) +
+      strpos($_SERVER['HTTP_REFERER'], $_SERVER['SERVER_NAME']) + 1));
+    $referrer_parts = explode('/', $parent_path);
+    if (count($referrer_parts) > 1) {
+      $parent = node_load($referrer_parts[1]);
+      $fields = $parent->item_fields;
+    } else {
+      $fields = hg_reader_field_defaults('item_defaults', 'items');
+      //dpm($fields);
+    }
+    $fields = isset($fields['item_fields_' . rtrim($node['type']['value'], 's') . 's']) ? $fields['item_fields_' . rtrim($node['type']['value'], 's') . 's'] : array();
+
+    return theme('hg_item', array(
+      'node' => $node,
+      'media' => $node['media'],
+      'fields' => $fields,
+    ));
+  } else {
+    drupal_goto(drupal_get_normal_path(variable_get('site_frontpage', 'node')));
+  }
+}
+
+/**
+ * Implementation of hook_form_alter(). Adds Mercury options to node type forms and node forms.
+ *
+ * @param $form
+ * @param $form_state
+ * @param $form_id
+ */
+function hg_reader_form_alter(&$form, $form_state, $form_id) {
+  switch ($form_id) {
+    case 'node_type_form':
+      $form['mercury'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Mercury settings'),
+        '#group' => 'additional_settings',
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#weight' => 32,
+      );
+      $form['mercury']['hg_use'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Allow Mercury feeds to be displayed on pages of this type.'),
+        '#default_value' => variable_get('hg_use_'. $form['#node_type']->type, FALSE),
+      );
+      break;
+  }
+}
+
+/**
+ * Determine if a given node has Mercury fields.
+ * @param $type
+ *  The node object or the node's type
+ *
+ * @return
+ *  Returns a Boolean.
+ */
+function hg_reader_has_mercury_fields($node = NULL, $perm = NULL, $type = NULL) {
+  return variable_get('hg_use_'. (is_null($node) ? $type : $node->type), FALSE) && user_access($perm);
+}
+
+/**
+ * Set or log error messages as appropriate.
+ *
+ * @param $message
+ * @param $severity
+ */
+function hg_reader_message($message, $severity) {
+  switch ($severity) {
+    case 'error':
+      if (variable_get('error_level') > 0) { drupal_set_message($message, $severity); }
+      else { watchdog('hg_reader', $message, array(), WATCHDOG_ERROR); }
+      break;
+    case 'warning':
+      if (variable_get('error_level') > 0) { drupal_set_message($message, $severity); }
+      else { watchdog('hg_reader', $message, array(), WATCHDOG_WARNING); }
+      break;
+  }
+}
+
+/**
+ * @param $modules
+ */
+function hg_reader_modules_installed($modules) {
+  if (in_array('pathauto', $modules)) {
+    variable_set('pathauto_hg_reader_pattern', '[hg:parent]/[hg:title]');
+  }
+}
+
+/**
+ * @param $modules
+ */
+function hg_reader_modules_uninstalled($modules) {
+  if (in_array('pathauto', $modules)) {
+    variable_del('pathauto_hg_reader_pattern');
+  }
+}
+
+/**
+ * Implementation of hook_path_alias_types. Allows bulk deletion of Mercury aliases.
+ *
+ * @return mixed
+ */
+function hg_reader_path_alias_types() {
+  $objects['hg/item/'] = t('Mercury items');
+  return $objects;
+}
+
+/**
+ * Implementation of hook_path_update
+ *
+ * @param $path
+ */
+function hg_reader_path_update($path) {
+  // if the path is a mercury item, or if the alias didn't change, move along
+  if (strpos($path['source'], 'hg/item') !== FALSE || $path['alias'] == $path['original']['alias']) { return; }
+
+  // get the node
+  $node = node_load(trim(strstr($path['source'], '/'), '/'));
+  // does this page have mercury items whose aliases will need to be updated?
+  if (hg_reader_has_mercury_fields($node) && $node->feed_id != '') {
+
+    // grab the feed xml
+    $filter_date = date('Ymd');
+    $feed_attrs = array(
+      'xslt' => variable_get('hg_item_xsl', drupal_get_path('module', 'hg_reader') . '/xsl/hgSerializedItem.xsl'),
+      'cacheTime' => 3600,
+      'xslParams' => array('filter_string'=>$filter_date, 'index'=> 1)
+    );
+
+    // la la la, we're stupidly duplicating code from hg_reader_node_view. this needs to be abstracted into a function.
+    $feeds = hg_reader_reader($node->feed_id, $feed_attrs);
+    if ($feeds[0] == 0) { return; }
+    array_shift($feeds);
+    $combined_feeds = array();
+    foreach ($feeds as $feed) { $combined_feeds = array_merge($combined_feeds, unserialize($feed)); }
+    foreach ($combined_feeds as &$feed) { hg_reader_decode($feed); }
+
+    if (count($feeds) > 1) {
+      //remove dupes and sort combined feeds
+      $combined_feeds = array_map("unserialize", array_unique(array_map("serialize", $combined_feeds)));
+      usort($combined_feeds, 'hg_reader_sort_feed');
+    }
+    // trim $combined_feeds to feed_item_count
+    if ($node->feed_item_count > 0) { $combined_feeds = array_slice($combined_feeds, 0, $node->feed_item_count); }
+
+    // update them aliases
+    foreach ($combined_feeds as &$feed) {
+      $src = 'hg/item/' . $feed['nid'];
+      $parent = $path['alias'];
+      $data = array(
+        'parent' => $parent,
+        'title' => $feed['title'],
+      );
+      pathauto_create_alias('hg_reader', 'update', $src, $data);
+    }
+  }
+}
+
+/**
+ * Implementation of hook_pathauto. Generates URLs for Mercury items.
+ *
+ * @param $op
+ * @return stdClass
+ */
+function hg_reader_pathauto($op) {
+
+  $settings = new stdClass;
+  $settings->module = 'hg_reader';
+  $settings->groupheader = t('Mercury Reader settings');
+  $settings->patterndescr = t('The default pattern for Mercury items.');
+  $settings->patterndefault = t('[hg:parent]/[hg:title]');
+  $settings->token_type = 'hg';
+
+  return $settings;
+}
+
+/**
+ * Theme preprocessor
+ *
+ * @param $vars
+ */
+function hg_reader_preprocess_hg_feed(&$vars) {
+  hg_reader_preprocess_general($vars);
+
+  // theme suggestions and css classes
+  $vars['theme_hook_suggestions'][] = 'hg_feed__' . $vars['id'];
+  foreach ($vars['classes'] as $class) {
+    $vars['theme_hook_suggestions'][] = 'hg_feed__' . $class;
+  }
+}
+
+function hg_reader_preprocess_hg_block(&$vars) {
+  hg_reader_preprocess_general($vars);
+
+  // theme suggestions and css classes
+  $vars['theme_hook_suggestions'][] = 'hg_block__' . $vars['id'];
+  foreach ($vars['classes'] as $class) {
+    $vars['theme_hook_suggestions'][] = 'hg_block__' . $class;
+  }
+}
+
+function hg_reader_preprocess_general(&$vars) {
+  // hg_reader css
+  drupal_add_css(drupal_get_path('module', 'hg_reader') . '/hg_reader.css');
+
+  // I have no idea what this is for.
+  $vars['base_path'] = base_path();
+
+  // empty feed?
+  if (!$vars['feeds']) { $vars['feeds'][0] = array('type' => 'empty'); }
+
+  // chop feed to maximum specified length
+  if ($vars['maximum'] != 0) { $vars['feeds'] = array_slice($vars['feeds'], 0, $vars['maximum']); }
+
+  $vars['classes_array'] = array_unique(array_merge($vars['classes_array'], $vars['classes']));
+
+  // massage with pathauto if available
+  if (module_exists('pathauto')) {
+    module_load_include('inc', 'pathauto');
+    foreach ($vars['feeds'] as &$feed) {
+      if ($feed['type'] == 'empty') { continue; }
+      $src = 'hg/item/' . $feed['nid'];
+      // is there already an alias for this item?
+      if (!drupal_lookup_path('alias', $src)) {
+        // did the user supply a parent?
+        if ($vars['parent'] == '') { return; }
+        // make the alias
+        $data = array(
+          'parent' => $vars['parent'] ? $vars['parent'] : 'node/' . intval(arg(1)),
+          'title' => $feed['title'],
+        );
+        pathauto_create_alias('hg_reader', 'insert', $src, $data);
+      }
+    }
+  }
+}
+
+/**
+ * Item preprocessor. Decodes item and themes media elements before passing item to to the template.
+ *
+ * @param $vars
+ */
+function hg_reader_preprocess_hg_item(&$vars) {
+  hg_reader_decode($vars['node']);
+  $_SESSION['hg_item_title'] = $vars['node']['title'];
+  if (is_array($vars['node']['media'])) {
+    $vars['media'] = theme('hg_media', array('items' => $vars['node']['media']));
+  }
+}
+
+/**
+ * Page preprocessor. Passes item title to page template.
+ *
+ * @param $vars
+ */
+function hg_reader_preprocess_page(&$vars) {
+  if (arg(0) == 'hg') { $vars['title'] = $_SESSION['hg_item_title']; }
+}
+
+/**
+ * Helper function for sorting items in combined feeds
+ *
+ * @param $a
+ * @param $b
+ * @return int
+ */
+function hg_reader_sort_feed($a, $b) {
+  return (hg_reader_comparator($a) < hg_reader_comparator($b)) ? 1 : -1;
+}
+
+/**
+ * Implementation of hook_theme().
+ *
+ * @param $existing
+ * @param $type
+ * @param $theme
+ * @param $path
+ * @return array
+ */
+function hg_reader_theme($existing, $type, $theme, $path) {
+  return array(
+    'hg_feed' => array(
+      'template' => 'templates/hg_feed',
+      'variables' => array(
+        'feeds' => NULL,
+        'fields' => NULL,
+        'page' => NULL,
+        'maximum' => NULL,
+        'offset' => NULL,
+        'total' => NULL,
+        'classes' => NULL,
+        'is_block' => NULL,
+        'base_path' => NULL,
+      ),
+    ),
+    'hg_block' => array(
+      'template' => 'templates/hg_block',
+      'variables' => array(
+        'feeds' => NULL,
+        'fields' => NULL,
+        'page' => NULL,
+        'maximum' => NULL,
+        'offset' => NULL,
+        'total' => NULL,
+        'classes' => NULL,
+        'is_block' => NULL,
+        'base_path' => NULL,
+      ),
+    ),
+    'hg_item' => array(
+      'template' => 'templates/hg_item',
+      'variables' => array(
+        'node' => NULL,
+        'fields' => NULL,
+        'media' => NULL,
+      ),
+    ),
+    'hg_media' => array(
+      'template' => 'templates/hg_media',
+      'variables' => array(
+        'items' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_tokens. Tokens specifically for Mercury items.
+ *
+ * @param $type
+ * @param $tokens
+ * @param array $data
+ * @param array $options
+ * @return array
+ */
+function hg_reader_tokens($type, $tokens, array $data = array(), array $options = array()) {
+  if ($type != 'hg') { return; }
+  $replacements = array();
+
+  foreach ($tokens as $name => $original) {
+    switch ($name) {
+      case 'title':
+        $replacements[$original] = pathauto_cleanstring($data['title']);
+        break;
+      case 'parent':
+        $replacements[$original] = pathauto_cleanstring($data['parent']);
+        break;
+    }
+  }
+  return $replacements;
+}
+
+/**
+ * Implementation of hook_token_info. Tokens specifically for Hg items.
+ *
+ * @return array
+ */
+function hg_reader_token_info() {
+  $type = array(
+    'name' => 'Hg',
+    'description' => t('Tokens for Mercury items'),
+  );
+
+  $hg['title'] = array(
+    'name' => t('Item title'),
+    'description' => t('The title of the item.'),
+  );
+  $hg['parent'] = array(
+    'name' => t('Item parent alias'),
+    'description' => t('The alias of the item parent.'),
+  );
+
+  return array(
+    'types' => array('hg' => $type),
+    'tokens' => array('hg' => $hg),
+  );
+}

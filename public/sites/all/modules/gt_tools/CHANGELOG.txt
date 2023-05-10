@@ -1,0 +1,16 @@
+GT TOOLS 7.x-2.9, 2017-06-07
+----------------------------------
+-Fix "mymodule" error
+-Fix incorrect permissions (and add fine-grained permissions for adding block style classes)
+-Update module versions to match recommended minimum GT Theme version
+-For GT Content Types:
+--Fix incomplete uninstall (will now remove all content and content types)
+--Update required and recommended module dependencies
+
+GT TOOLS 7.x-2.1, 2014-01-07
+----------------------------------
+- Alterations to GT Directory module to address FERPA concerns.
+
+GT TOOLS 7.x-2.0, 2013-09-27
+----------------------------------
+- Initial release

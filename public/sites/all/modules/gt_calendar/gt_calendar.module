@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the GT Calendar feature.
+ */
+
+include_once 'gt_calendar.features.inc';

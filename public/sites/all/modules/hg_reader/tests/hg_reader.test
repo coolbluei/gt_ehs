@@ -1,0 +1,123 @@
+<?php
+
+/**
+ * Tests the functionality of Mercury nodes.
+ */
+class HgReaderNodeTestCase extends DrupalWebTestCase {
+  protected $privileged_user;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Mercury nodes',
+      'description' => 'Tests the functionality of Mercury nodes.',
+      'group' => 'Mercury',
+    );
+  }
+
+  public function setUp() {
+    parent::setUp(array('hg_reader', 'pathauto'));
+    // Create and log in our privileged user.
+    $this->privileged_user = $this->drupalCreateUser(array(
+      'administer content types',
+      'administer mercury reader',
+      'manage mercury nodes',
+      'create page content',
+      ));
+    $this->drupalLogin($this->privileged_user);
+  }
+
+  /**
+   * Hg Reader node test
+   */
+  public function testHgReaderNodeFeedCreate() {
+    // Set up basic page content type to use Mercury fields.
+    $edit = array();
+    $edit['hg_use'] = TRUE;
+    $this->drupalPost('admin/structure/types/manage/page', $edit, t('Save content type'));
+
+    $this->assertTrue(hg_reader_has_mercury_fields(NULL, NULL, 'page'), 'The content type Basic uses Mercury fields');
+
+    // Create a page
+    $edit = array(
+      'title' => $this->randomName(8),
+      'body[und][0][value]' => $this->randomName(16),
+    );
+
+    $this->drupalPost('node/add/page', $edit, t('Save'));
+    $this->assertText(t('Basic page @title has been created.', array('@title' => $edit['title'])));
+
+    // Create a Mercury feed
+    $node = $this->drupalGetNodeByTitle($edit['title']);
+    $edit = array(
+      'feed_id' => '42142',
+      'feed_item_count' => '5',
+      'feed_classes' => $this->randomName(8),
+      'feed_parent' => $this->randomName(8),
+    );
+
+    $this->drupalPost('node/' . $node->nid . '/hg', $edit, t('Save changes'));
+    $this->drupalGet('node/' . $node->nid);
+
+    $this->assertRaw('<li class="hg-feed-item', 'A Mercury item exists.');
+    $this->assertRaw('<div class="hg-feed-wrapper hg-feed ' . $edit['feed_classes'], 'Feed classing is functional.');
+    $this->assertRaw('<a href="/' . pathauto_cleanstring($edit['feed_parent']), 'Feed parenting is functional.');
+  }
+}
+
+/**
+ * Tests the functionality of Mercury blocks.
+ */
+class HgReaderBlockTestCase extends DrupalWebTestCase {
+  protected $privileged_user;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Mercury blocks',
+      'description' => 'Tests the functionality of Mercury blocks.',
+      'group' => 'Mercury',
+    );
+  }
+
+  public function setUp() {
+    parent::setUp(array('hg_reader', 'pathauto'));
+    // Create and log in our privileged user.
+    $this->privileged_user = $this->drupalCreateUser(array(
+      'administer mercury reader',
+      'administer blocks',
+      ));
+    theme_enable(array('bartik'));
+    $this->drupalLogin($this->privileged_user);
+  }
+
+  /**
+   * Hg Reader block test
+   */
+  public function testHgReaderBlockFeedCreate() {
+
+    // Confirm that the add Mercury block link appears on block overview pages.
+    $this->drupalGet('admin/structure/block');
+    $this->assertRaw(l('Add Mercury block', 'admin/structure/block/add-hg'), t('Add Mercury block link is present on block overview page for default theme.'));
+    // This isn't working.
+    //$this->drupalGet('admin/structure/block/list/seven');
+    //$this->assertRaw(l('Add Mercury block', 'admin/structure/block/list/seven/add'), t('Add Mercury block link is present on block overview page for non-default theme.'));
+
+    // Create a Mercury block.
+    $block = array(
+      'admin_title' => $this->randomName(8),
+      'feed_id' => '42142',
+      'feed_item_count' => '5',
+      'feed_classes' => $this->randomName(8),
+      'feed_parent' => $this->randomName(8),
+    );
+    $this->drupalPost('admin/structure/block/add-hg', $block, t('Save block'));
+
+    // Confirm that the custom block has been created, and then query the created bid.
+    $this->assertText(t('The block has been created.'), t('Mercury block successfully created.'));
+    $bid = db_query('SELECT bid FROM {hg_feeds_blocks} WHERE title = :admin_title', array(':admin_title' => $block['admin_title']))->fetchField();
+
+    // Check to see if the custom block was created by checking that it's in the database.
+    $this->assertNotNull($bid, t('Mercury block found in database'));
+  }
+}
+
+?>

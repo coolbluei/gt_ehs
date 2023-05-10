@@ -1,0 +1,550 @@
+/**
+ * @file
+ * Default typography settings
+ *
+ * Includes styling for all typography, lists, etc.
+ *
+ */
+
+p, h1, h2, h3, h4, h5, h6 {
+	text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-family: "Roboto Condensed", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+	font-style: normal;
+	font-weight: 600;
+	line-height: 1;
+	letter-spacing: .035rem;
+	margin: 0 0 0.25rem 0;
+}
+
+h1 small, h2 small, h3 small, h4 small, h5 small, h6 small {
+	color: #545454;
+	font-size: 60%;
+	line-height: 0;
+}
+
+h1 {
+	font-size: 2.266em;
+}
+
+h2 {
+	font-size: 2em;
+}
+
+h3 {
+	font-size: 1.733em;
+}
+
+h4 {
+	font-size: 1.466em;
+}
+
+h5 {
+	font-size: 1.266em;
+}
+
+h6 {
+	font-size: 1.1em;
+}
+
+p {
+	font-size: 1em;
+	font-weight: 400;
+	letter-spacing: .025em;
+	line-height: 1.6;
+	margin: 0 0 1.29em;
+}
+
+dl, ol, ul {
+	font-size: 1em;
+	line-height: 1.6;
+	list-style-position: outside;
+	margin: 0 0 1.29em;
+	padding: 0;
+}
+
+ol {
+	padding-left: 1.8em;
+}
+
+ul {
+	padding-left: 1.6em;
+}
+
+ol ol, ol ul, ul ul, ul ol {
+	font-size: 1em;
+	margin: .5em 0;
+}
+
+li {
+	font-weight: 400;
+	margin-bottom: .5em;
+}
+
+li li {
+	margin-bottom: 0;
+}
+
+/*
+.content ul, .content ol {
+  list-style: none;
+  margin-left: 2.6rem;
+  padding: 0;
+  text-indent: -1rem;
+}
+
+.content ol {
+  counter-reset: item;
+  list-style-type: none;
+}
+
+.content ol li:before {
+  content: counters(item, " ")" ";
+  counter-increment: item;
+  color: #857437;
+  font-weight: 600;
+  padding-right: .125rem;
+}
+
+.content ol ol li:before {
+  content: counter(item,lower-alpha) " ";
+  counter-increment: item;
+}
+
+
+.content ul li:before {
+  color: #857437;
+  content: '\25FC' " ";
+  position: relative;
+  padding-right: .125rem;
+  bottom: .125rem;
+  width: 1rem;
+}
+
+/* add custom bullet to UL */
+.content ul ul li:before {
+	content: '\25C6' " ";
+}
+
+/* remove custom bullets from internal menus */
+.content ul.menu li::before {
+	display: none;
+}
+
+.content li li {
+	margin-bottom: 0;
+}
+
+dl dt {
+	font-weight: bold;
+	margin-bottom: 0.3em;
+}
+
+dl dd {
+	margin: 0 0 .5em .5em;
+}
+
+hr {
+	border: solid #808080;
+	border-width: 1px 0 0;
+	clear: both;
+	margin: 1.25em 0 1.1875em;
+	height: 0;
+}
+
+em, i {
+	font-style: italic;
+	line-height: inherit;
+}
+
+strong, b {
+	font-weight: bold;
+	line-height: inherit;
+}
+
+small {
+	font-size: 60%;
+	line-height: inherit;
+}
+
+code {
+	color: #7f0a0c;
+	font-family: Consolas, "Liberation Mono", Courier, monospace;
+	font-weight: bold;
+}
+
+abbr, acronym {
+	border-bottom: 1px dotted #e5e5e5;
+	color: #262626;
+	cursor: help;
+	font-size: 90%;
+	text-transform: uppercase;
+}
+
+abbr {
+	text-transform: none;
+}
+
+p.intro-text {
+	font-size: 1.4em;
+	line-height: 1.5;
+	margin: 0 0 1.142em;
+}
+
+p.cutline-text {
+	color: #262626;
+	font-size: 0.8em;
+	line-height: 1.5em;
+	margin-bottom: 1.57em;
+	padding: 6px 3px 0;
+}
+
+blockquote {
+	border-left: 5px solid #b3a369;
+	color: #545454;
+	font-size: 1.286em;
+	margin: 0 0 1.25em -5px;
+	padding: 0.5625em 0.857em;
+}
+
+blockquote cite {
+	color: #545454;
+	display: block;
+}
+
+blockquote cite:before {
+	content: "\2014 \0020";
+	font-family: "FontAwesome";
+}
+
+blockquote cite a,
+blockquote cite a:visited {
+	color: #545454;
+}
+
+blockquote.pull-quote-left {
+	float: left;
+	margin: 0 12px 6px -5px;
+	width: 50%;
+}
+
+blockquote.pull-quote-right {
+	float: right;
+	margin: 0 -5px 6px 12px;
+	width: 50%;
+}
+
+/* Link/button styling */
+.content .highlight-link-blue a,
+.content .highlight-link-blue a:link,
+.content .highlight-link-yellow a,
+.content .highlight-link-yellow a:link,
+.content .highlight-link-gray a,
+.content .highlight-link-gray a:link,
+.content .gt-black-fade-button a,
+.content .gt-black-fade-button a:link,
+.content .gt-gold-fade-button a,
+.content .gt-gold-fade-button a:link {
+	font-weight: 500;
+	letter-spacing: .03rem;
+	font-size: 1rem;
+	text-decoration: none;
+	border: 0;
+	border-radius: 2px;
+	-moz-box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+	-webkit-box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+	box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2);
+	display: inline-block;
+	padding: .75em 1em;
+	position: relative;
+	vertical-align: bottom;
+	transition: all .2s ease-in-out;
+	margin: .5rem 0;
+}
+
+.content blockquote .highlight-link-blue a,
+.content blockquote .highlight-link-yellow a,
+.content blockquote .highlight-link-gray a {
+	padding-left: 40px;
+}
+
+.content .highlight-link-blue a::before,
+.content .highlight-link-yellow a::before,
+.content .highlight-link-gray a::before {
+	display: none !important;
+}
+
+/* gold buttons */
+.content .highlight-link-yellow a,
+.content .highlight-link-yellow a:link,
+.content .highlight-link-yellow a:visited {
+	color: #333333;
+	background-color: #b3a369;
+}
+
+.content .highlight-link-yellow a:hover,
+.content .highlight-link-yellow a:active {
+	color: #333333;
+	background-color: #bfb37c;
+}
+
+/* blue buttons */
+.content .highlight-link-blue a,
+.content .highlight-link-blue a:link,
+.content .highlight-link-blue a:visited {
+	color: #FFFFFF;
+	background-color: #003057;
+}
+
+.content .highlight-link-blue a:hover,
+.content .highlight-link-blue a:active {
+	color: #FFFFFF;
+	background-color: #004F9F;
+}
+
+/* gray buttons */
+.content .highlight-link-gray a,
+.content .highlight-link-gray a:link,
+.content .highlight-link-gray a:visited {
+	color: #ffffff;
+	background-color: #3b3b3b;
+}
+
+.content .highlight-link-gray a:hover,
+.content .highlight-link-gray a:active {
+	color: #ffffff;
+	background-color: #545454;
+}
+
+/* gold fade buttons */
+.content .gt-gold-fade-button a,
+.content .gt-gold-fade-button a:link,
+.content .gt-gold-fade-button a:visited {
+	color: #333333;
+	background-color: #b3a369;
+}
+
+.content .gt-gold-fade-button a:hover,
+.content .gt-gold-fade-button a:active {
+	color: #ffffff;
+	background-color: #333333;
+}
+
+/* black fade buttons */
+.content .gt-black-fade-button a,
+.content .gt-black-fade-button a:link,
+.content .gt-black-fade-button a:visited {
+	color: #ffffff;
+	background-color: #333333;
+}
+
+.content .gt-black-fade-button a:hover,
+.content .gt-black-fade-button a:active {
+	color: #333333;
+	background-color: #b3a369;
+}
+
+/* jump links */
+.content .jump-link a,
+.content .jump-link a:link,
+.content .jump-link a:visited {
+	text-decoration: none;
+	transition: all .2s ease-in-out;
+	border-top: 1px solid #eeeeee;
+	border-bottom: 1px solid #eeeeee;
+	color: #004f9f;
+	display: inline-block;
+	padding: 3px 20px 5px 36px;
+	position: relative;
+	vertical-align: bottom;
+}
+
+.content .jump-link a:visited {
+	color: #730053;
+}
+
+.content .jump-link a:hover,
+.content .jump-link a:active {
+	color: #1879db;
+}
+
+.content .jump-link a:before {
+	background-color: #B3A369;
+	border-radius: 20px 20px 20px 20px;
+	color: #FFFFFF;
+	content: "\f064";
+	display: inline-block;
+	font-family: "FontAwesome";
+	font-size: 0.77em;
+	height: 20px;
+	left: 8px;
+	padding: 2px 0 0 5px;
+	position: absolute;
+	top: 5px;
+	width: 20px;
+}
+
+.content blockquote .jump-link a:before {
+	top: 7px;
+}
+
+/* Microformats */
+.vcard {
+	border: 1px solid #EEEEEE;
+	display: inline-block;
+	margin: 0 0 1.25em 0;
+	padding: 0.625em 0.75em;
+}
+
+.vcard li {
+	display: block;
+	margin: 0;
+}
+
+.vcard .fn {
+	font-size: 0.9375em;
+	font-weight: bold;
+}
+
+.vevent .summary {
+	font-weight: bold;
+}
+
+.vevent abbr {
+	border: none;
+	cursor: default;
+	font-weight: bold;
+	padding: 0 0.0625em;
+	text-decoration: none;
+}
+
+/**
+ * Tweaks to Drupal defaults
+ */
+/* list & table markup */
+.item-list ul {
+	padding-left: 1.6em;
+}
+
+.item-list ul li {
+	margin: 0 0 .5em;
+	padding: 0;
+}
+
+.item-list ul li li {
+	margin: 0;
+}
+
+.item-list ul ul {
+	margin: .5em 0;
+}
+
+tr.even {
+	background-color: #FFFFFF;
+}
+
+ul.primary li a {
+	border-radius: 5px 5px 0 0;
+	padding: 0 1.5em;
+}
+
+/* form elements */
+button, html input[type="button"], input[type="reset"], input[type="submit"] {
+	font-weight: 700;
+	margin: 0 0.5em;
+}
+
+fieldset {
+	margin: 0 0 1.29em;
+	padding: 1em;
+}
+
+fieldset.collapsed {
+	margin: 0;
+}
+
+fieldset.filter-wrapper {
+	border-top: 1px solid #808080;
+}
+
+legend {
+	font-size: 1.286em;
+	font-weight: 700;
+}
+
+.form-type-radio .description, .form-type-checkbox .description {
+	margin-left: 1.5em;
+}
+
+input[type="textfield"], input[type="file"], input.form-text, input.form-file {
+	border: 1px solid #262626;
+	padding: 1px;
+}
+
+/**
+ * PLACEHOLDER: baseline typography overrides for structural elements and/or regions
+ */
+
+/**
+ * Media Query Breakpoints
+ *
+ * Breakpoints are calculated based on a browser default font-size of 16px and NOT what the base
+ * font-size is set to be (which is ~14px in this case of this page.) Plus, if the user decides to
+ * increase their default font size for their browser the layout will drop down to a lower
+ * breakpoint (provided font size is increased enough), thus making for a more usable page!
+ */
+
+/* ~496px and less */
+@media only screen and (max-width: 31em) {
+
+	/*
+	h1, h2, h3, h4, h5, h6 { line-height: 1.2125em; }
+	h1 { font-size: 2.125em; }
+	h2 { font-size: 1.6875em; }
+	h3 { font-size: 1.375em; }
+	h4 { font-size: 1.125em; }
+	*/
+	blockquote, blockquote.pull-quote-left,
+	blockquote.pull-quote-right {
+		float: none;
+		margin-left: 0;
+		width: 100%;
+	}
+
+	p.intro-text {
+		font-size: 1.25em;
+		line-height: 1.5;
+	}
+
+}
+
+/* ~496px to ~816px */
+@media only screen and (min-width: 31em) and (max-width: 51em) {
+
+	/*
+	h1, h2, h3, h4, h5, h6 { line-height: 1.2125em; }
+	h1 { font-size: 2.125em; }
+	h2 { font-size: 1.6875em; }
+	h3 { font-size: 1.375em; }
+	h4 { font-size: 1.125em; }
+	*/
+	blockquote, blockquote.pull-quote-left,
+	blockquote.pull-quote-right {
+		float: none;
+		margin-left: 0;
+		width: 100%;
+	}
+
+}
+
+/* ~816px or more */
+@media only screen and (min-width: 51em) {
+
+}
+
+/* ~1024px or more */
+@media only screen and (min-width: 64em) {
+
+}

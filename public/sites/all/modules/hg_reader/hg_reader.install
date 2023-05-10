@@ -1,0 +1,507 @@
+<?php
+
+/**
+ * Check for proper cache directory on run.
+ */
+
+function hg_reader_requirements($phase) {
+  $requirements['hg_reader']['title'] = t('Mercury Reader');
+  $requirements['hg_reader']['value'] = variable_get('hg_cache_location');
+  switch ($phase) {
+    case 'runtime':
+      $cache_location = variable_get('hg_cache_location', file_default_scheme() . '://hg/cache' . '/');
+      if (file_prepare_directory($cache_location)) {
+        $requirements['hg_reader']['severity'] = REQUIREMENT_OK;
+      } else {
+        $requirements['hg_reader']['severity'] = REQUIREMENT_WARNING;
+        /** TODO: the link below probably shouldn't be hardcoded. */
+        $requirements['hg_reader']['description'] = t('The Mercury cache location is invalid. Please <a href="admin/config/hg/hg-reader">update it</a>.');
+      }
+      break;
+  }
+  return $requirements;
+}
+
+/**
+ * Install tasks
+ *
+ * @todo Pathauto variable should only be set up when pathauto is present. This will require the
+ *    implementation of whatever hook pathauto provides to set up the variable if pathauto is
+ *    installed at a later time.
+ */
+
+function hg_reader_install() {
+  // Set up cache directory
+  $directory = file_default_scheme() . '://hg/cache';
+  file_prepare_directory($directory, FILE_CREATE_DIRECTORY | FILE_MODIFY_PERMISSIONS);
+  if (module_exists('pathauto')) {
+    // Set up default pathauto pattern for hg items
+    variable_set('pathauto_hg_reader_pattern', '[hg:parent]/[hg:title]');
+  }
+}
+
+/**
+ * Uninstall tasks
+ */
+
+function hg_reader_uninstall() {
+  // Slay the cache directory and all the crap in it.
+  file_unmanaged_delete_recursive(variable_get('hg_cache_location', file_default_scheme() . '://hg'));
+  // Vanquish Mercury variables
+  variable_del('hg_cache_location');
+  variable_del('hg_cache_item_timeout');
+  variable_del('hg_cache_file_timeout');
+  variable_del('hg_curl_timeout');
+  variable_del('hg_feed_xsl');
+  variable_del('hg_item_xsl');
+  variable_del('hg_pathclean_lastrun');
+  variable_del('hg_reader_block_ids');
+  variable_del('pathauto_hg_reader_pattern');
+  variable_del('hg_events_defaults');
+  variable_del('hg_news_defaults');
+  // Cut the hearts out of any Mercury blocks still hanging around.
+  db_delete('block')
+    ->condition('module', 'hg_reader')
+    ->execute();
+  // Prepare unmarked graves for all Mercury aliases
+  if (module_exists('pathauto')) { pathauto_path_delete_all('hg'); }
+  // Murder hg_use_ variables, execution style.
+  $types = node_type_get_types();
+  foreach ($types as $type) {
+    $usevar = variable_get('hg_use_' . $type->type, '');
+    if ($usevar != '') {
+      variable_del('hg_use_' . $type->type);
+    }
+  }
+  // You would think uninstalling modules would get rid of menu stuff by default, but stuff seems to hang around.
+  menu_rebuild();
+}
+
+/**
+ * hg_reader database schema
+ */
+
+function hg_reader_schema() {
+  $schema['hg_feeds'] = array(
+    'description' => 'The base table for Mercury feeds',
+    'fields' => array(
+      'fid' => array(
+        'description' => 'The primary identifier for a feed instance',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'hg_fid' => array(
+        'description' => 'The id of the feed in Mercury',
+        'type' => 'varchar',
+        'length' => '255'),
+      'maximum' => array(
+        'description' => 'The maximum number of items in this feed',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'parent' => array(
+        'description' => 'The parent URL of items in this block',
+        'type' => 'text',
+      ),
+      'page' => array(
+        'description' => 'A feed paging flag',
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => 0,
+        'not null' => TRUE,
+      ),
+      'sort' => array(
+        'description' => 'A feed sorting flag',
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => 0,
+        'not null' => TRUE,
+      ),
+      'feed_fields' => array(
+        'description' => 'Storage for feed field flags',
+        'type' => 'text',
+        'size' => 'medium',
+      ),
+      'item_fields' => array(
+        'description' => 'Storage for item field flags',
+        'type' => 'text',
+        'size' => 'medium',
+      ),
+      'item_fields_override' => array(
+        'description' => 'Flag indicating whether item field selections are overridden',
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => 0,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('fid'),
+  );
+  $schema['hg_feeds_nodes'] = array(
+    'description' => 'The table for node-specific feed information',
+    'fields' => array(
+      'fid' => array(
+        'description' => 'The primary identifier for a feed instance',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'nid' => array(
+        'description' => 'The id of the node to which this feed instance is attached',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+  );
+  $schema['hg_feeds_blocks'] = array(
+    'description' => 'The table for block-specific feed information',
+    'fields' => array(
+      'fid' => array(
+        'description' => 'The primary identifier for a feed instance',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'bid' => array(
+        'description' => 'The id of the node to which this feed instance is attached',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'title' => array(
+        'description' => 'The administrative title of this block',
+        'type' => 'text'),
+    ),
+  );
+  $schema['hg_feeds_classes'] = array(
+    'description' => 'The table for Mercury feed classes',
+    'fields' => array(
+      'fid' => array(
+        'description' => 'The primary identifier for a feed instance',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'class' => array(
+        'desciption' => 'The class identifier string',
+        'type' => 'text',
+      ),
+    ),
+  );
+  $schema['cache_hg'] = array(
+    'description' => 'The table for Mercury caching',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'A unique cache ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+      ),
+      'data' => array(
+        'description' => 'XML or file info to cache',
+        'type' => 'text',
+        'size' => 'medium',
+      ),
+      'expire' => array(
+        'description' => 'A Unix timestamp indicating when the cache entry should expire, or 0 for never.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'unique keys' => array(
+      'cid' => array('cid'),
+    ),
+  );
+  return $schema;
+}
+
+/**
+ * Add hg_feeds_classes table (7.x-1.10)
+ */
+function hg_reader_update_7100(&$sandbox) {
+  $schema['hg_feeds_classes'] = array(
+    'description' => 'The base table for Mercury feed classes',
+    'fields' => array(
+      'fid' => array(
+        'description' => 'The primary identifier for a feed instance',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'class' => array(
+        'desciption' => 'The class identifier string',
+        'type' => 'text',
+      ),
+    ),
+  );
+  db_create_table('hg_feeds_classes', $schema['hg_feeds_classes']);
+}
+
+/**
+ * Instantiate pathauto variable for systems that were running a previous version of Hg. (7.x-1.12)
+ *
+ * @todo This really needs to distinguish between systems running pathauto and systems not running it.
+ */
+function hg_reader_update_7101(&$sandbox) {
+  variable_set('pathauto_hg_reader_pattern', '[hg:parent-alias]/[hg:title]');
+}
+
+/**
+ * Add parent column to hg_feeds_blocks table (7.x-1.14)
+ */
+function hg_reader_update_7102(&$sandbox) {
+  $schema = array(
+    'description' => 'The parent URL of items in this block',
+    'type' => 'text',
+  );
+  db_add_field('hg_feeds_blocks', 'parent', $schema);
+  if (module_exists('pathauto')) {
+    module_load_include('inc', 'pathauto');
+    pathauto_path_delete_all('hg/item');
+  }
+}
+
+/**
+ * Add parent column to hg_feeds table. (7.x-1.15)
+ */
+function hg_reader_update_7103(&$sandbox) {
+  $schema = array(
+    'description' => 'The parent URL of items in this block',
+    'type' => 'text',
+  );
+  db_add_field('hg_feeds', 'parent', $schema);
+}
+
+/**
+ * Big schema change here, to account for overlap of fids in hg_feed and hg_feed_blocks tables.
+ * Buckle your seatbelts kids. (7.x-1.16)
+ */
+function hg_reader_update_7104(&$sandbox) {
+  // Gotta change this variable a bit.
+  variable_set('pathauto_hg_reader_pattern', '[hg:parent]/[hg:title]');
+
+  // This was a dumb idea.
+  variable_del('hg_pathclean_lastrun');
+
+  // Make the new hg_feeds_nodes table.
+  $schema['hg_feeds_nodes'] = array(
+    'description' => 'The table for node-specific feed information',
+    'fields' => array(
+      'fid' => array(
+        'description' => 'The primary identifier for a feed instance',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'nid' => array(
+        'description' => 'The id of the node to which this feed instance is attached',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+    ),
+  );
+  db_create_table('hg_feeds_nodes', $schema['hg_feeds_nodes']);
+
+  // Copy hg_feeds into hg_feeds_nodes.
+  db_query('INSERT INTO hg_feeds_nodes (fid, nid) SELECT fid, nid FROM hg_feeds');
+
+  // Drop the nid column from hg_feeds.
+  db_drop_field('hg_feeds', 'nid');
+
+  // Change hg_feeds_blocks fid from serial to int.
+  db_change_field('hg_feeds_blocks', 'fid', 'fid', array('type' => 'int', 'not null' => TRUE));
+
+  // Copy relevant information from hg_feeds_blocks to hg_feeds.
+  // First get hg_feeds_blocks.
+  $result = db_select('hg_feeds_blocks', 'hg')
+    ->fields('hg')
+    ->execute();
+  // For each block, insert necessary info into hg_feeds.
+  while ($entry = $result->fetchAssoc()) {
+    $index = db_insert('hg_feeds')
+      ->fields(array(
+        'hg_fid' => $entry['hg_fid'],
+        'maximum' => $entry['maximum'],
+        'parent' => $entry['parent'],
+      ))
+      ->execute();
+    // Update hg_feeds_blocks entry to match new hg_feeds entry.
+    db_update('hg_feeds_blocks')
+      ->fields(array(
+        'fid' => $index,
+      ))
+      ->condition('fid', $entry['fid'], '=')
+      ->execute();
+  }
+
+  // Drop unnecessary columns from hg_feeds_blocks.
+  db_drop_field('hg_feeds_blocks', 'hg_fid');
+  db_drop_field('hg_feeds_blocks', 'parent');
+  db_drop_field('hg_feeds_blocks', 'maximum');
+}
+
+/**
+ * Change all mercury_use_ variables to hg_use_ variables for consistency's sake.
+ * Establish caching table. (7.x-1.18)
+ */
+function hg_reader_update_7105(&$sandbox) {
+  $types = node_type_get_types();
+  foreach ($types as $type) {
+    $oldvar = variable_get('mercury_use_' . $type->type, '');
+    if ($oldvar != '') {
+      variable_set('hg_use_' . $type->type, 1);
+      variable_del('mercury_use_' . $type->type);
+    }
+  }
+
+  $schema['cache_hg'] = array(
+    'description' => 'The table for Mercury caching',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'A unique cache ID',
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+      ),
+      'data' => array(
+        'description' => 'XML or file info to cache',
+        'type' => 'text',
+        'size' => 'medium',
+      ),
+      'expire' => array(
+        'description' => 'A Unix timestamp indicating when the cache entry should expire, or 0 for never.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'unique keys' => array(
+      'cid' => array('cid'),
+    ),
+  );
+  db_create_table('cache_hg', $schema['cache_hg']);
+  menu_rebuild();
+}
+
+/**
+ * Add sort column to hg_feeds table (7.x-2.0)
+ */
+function hg_reader_update_7106(&$sandbox) {
+  $schema = array(
+    'description' => 'A feed sorting flag',
+    'type' => 'int',
+    'size' => 'tiny',
+    'default' => 0,
+    'not null' => TRUE,
+  );
+  db_add_field('hg_feeds', 'sort', $schema);
+}
+
+/**
+ * Add page column to hg_feeds table (7.x-2.1)
+ */
+function hg_reader_update_7107(&$sandbox) {
+  $schema = array(
+    'description' => 'A feed paging flag',
+    'type' => 'int',
+    'size' => 'tiny',
+    'default' => 0,
+    'not null' => TRUE,
+  );
+  db_add_field('hg_feeds', 'page', $schema);
+}
+
+/**
+ * Add fields column to hg_feeds table (7.x-2.3)
+ */
+function hg_reader_update_7108(&$sandbox) {
+  $schema = array(
+    'description' => 'Storage for feed field flags',
+    'type' => 'text',
+    'size' => 'medium',
+  );
+  db_add_field('hg_feeds', 'feed_fields', $schema);
+  $schema = array(
+    'description' => 'Storage for item field flags',
+    'type' => 'text',
+    'size' => 'medium',
+  );
+  db_add_field('hg_feeds', 'item_fields', $schema);
+  // Oh for God's sake...
+  $schema = array(
+    'description' => 'Flag indicating whether item field selections are overridden',
+    'type' => 'int',
+    'size' => 'tiny',
+    'default' => 0,
+    'not null' => TRUE,
+  );
+  db_add_field('hg_feeds', 'item_fields_override', $schema);
+}
+
+/**
+ * Translate feed fields from numeric to string storage.
+ */
+function hg_reader_update_7109(&$sandbox) {
+  // Recode feed field settings
+  $result = db_query('select fid, feed_fields from hg_feeds');
+  $options = hg_reader_field_defaults('defaults_options');
+  foreach ($options as $key => $option) {
+    $rekeyed['feed_fields_' . $key] = array_values($option);
+  }
+  foreach ($result as $record) {
+    $output = array();
+    $fields = unserialize($record->feed_fields);
+    foreach ($fields as $type => $data) {
+      foreach ($data as $field) {
+        $output[$type][$rekeyed[$type][$field]] = $rekeyed[$type][$field];
+      }
+    }
+    db_update('hg_feeds')
+      ->fields(array(
+        'feed_fields' => serialize($output),
+      ))
+      ->condition('fid', $record->fid)
+      ->execute();
+  }
+
+  // Recode item field settings
+  $result = db_query('select fid, item_fields from hg_feeds');
+  $options = hg_reader_field_defaults('defaults_options', 'items');
+  foreach ($options as $key => $option) {
+    $rekeyed['item_fields_' . $key] = array_values($option);
+  }
+  foreach ($result as $record) {
+    $output = array();
+    $fields = unserialize($record->item_fields);
+    foreach ($fields as $type => $data) {
+      foreach ($data as $field) {
+        $output[$type][$rekeyed[$type][$field]] = $rekeyed[$type][$field];
+      }
+    }
+    db_update('hg_feeds')
+      ->fields(array(
+        'item_fields' => serialize($output),
+      ))
+      ->condition('fid', $record->fid)
+      ->execute();
+  }
+
+  // Recode default feed settings
+  $options = hg_reader_field_defaults('defaults_options', 'items');
+  foreach ($options as $key => $option) {
+    $rekeyed['feed_fields_' . $key] = array_values($option);
+  }
+
+  foreach (array('events', 'news') as $type) {
+    $fields = variable_get('hg_' . $type . '_defaults', '');
+    if ($fields == '') {
+      continue;
+    }
+    foreach ($fields as $key => &$field) {
+      $field = $field ? $rekeyed['feed_fields_' . $type][$key] : 0;
+    }
+    variable_set('hg_' . $type . '_defaults', $fields);
+  }
+}

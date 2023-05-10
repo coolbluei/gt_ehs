@@ -1,0 +1,19 @@
+name = Block reference
+description = Defines a field type for referencing a block from a node.
+package = Fields
+core = 7.x
+
+dependencies[] = field
+dependencies[] = options
+dependencies[] = block
+dependencies[] = entity
+
+; Migrate handler.
+files[] = MigrateBlockReferenceFieldHandler.inc
+
+
+; Information added by Drupal.org packaging script on 2020-05-28
+version = "7.x-2.7+4-dev"
+core = "7.x"
+project = "blockreference"
+datestamp = "1590703682"

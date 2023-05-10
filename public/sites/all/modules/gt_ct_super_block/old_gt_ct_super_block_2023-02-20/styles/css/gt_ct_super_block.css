@@ -1,0 +1,174 @@
+/**
+* @file 
+* GT Super Block content type styling
+*/
+/* line 11, ../sass/gt_ct_super_block.scss */
+.nodeblock-gt-ct-super-block .block-body {
+  background: transparent !important;
+  background-color: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* line 19, ../sass/gt_ct_super_block.scss */
+.super-block__title {
+  font-size: 2em;
+  font-weight: 400;
+  line-height: 1.05;
+  margin: 0 0 10px;
+}
+/* line 25, ../sass/gt_ct_super_block.scss */
+.super-block__title a {
+  color: #454545;
+  display: block;
+  text-decoration: none;
+}
+/* line 29, ../sass/gt_ct_super_block.scss */
+.super-block__title a:link, .super-block__title a:visited, .super-block__title a:hover, .super-block__title a:active {
+  color: #454545;
+  text-decoration: none;
+}
+/* line 36, ../sass/gt_ct_super_block.scss */
+.sb-skin-blue .super-block__title, .sb-skin-blue .super-block__title a, .sb-skin-gold .super-block__title a {
+  color: #023d7b;
+}
+/* line 38, ../sass/gt_ct_super_block.scss */
+.sb-skin-blue .super-block__title:hover, .sb-skin-blue .super-block__title a:hover, .sb-skin-gold .super-block__title a:hover {
+  color: #023d7b;
+}
+
+/* line 45, ../sass/gt_ct_super_block.scss */
+.super-block__image {
+  float: left;
+  width: 100%;
+}
+/* line 49, ../sass/gt_ct_super_block.scss */
+.block.full-width .sb-image-left.sb-teaser-true .super-block__image, .block.three-quarter-width .sb-image-left.sb-teaser-true .super-block__image {
+  padding-right: 20px;
+  width: 30%;
+}
+/* line 54, ../sass/gt_ct_super_block.scss */
+.block.full-width .sb-image-right.sb-teaser-true .super-block__image, .block.three-quarter-width .sb-image-right.sb-teaser-true .super-block__image {
+  float: right;
+  padding-left: 20px;
+  width: 30%;
+}
+/* line 59, ../sass/gt_ct_super_block.scss */
+.super-block__image .super-block__image-wrapper {
+  margin-bottom: 10px;
+  position: relative;
+}
+
+/* line 66, ../sass/gt_ct_super_block.scss */
+.super-block__lower {
+  float: left;
+  width: 100%;
+}
+/* line 72, ../sass/gt_ct_super_block.scss */
+.block.full-width .sb-image-left.sb-teaser-true .super-block__lower, .block.full-width .sb-image-right.sb-teaser-true .super-block__lower, .block.three-quarter-width .sb-image-left.sb-teaser-true .super-block__lower, .block.three-quarter-width .sb-image-right.sb-teaser-true .super-block__lower {
+  width: 70%;
+}
+
+/* line 76, ../sass/gt_ct_super_block.scss */
+.super-block__jump-link {
+  margin-bottom: 10px;
+  position: relative;
+}
+/* line 79, ../sass/gt_ct_super_block.scss */
+.super-block__jump-link a {
+  background-color: #646464;
+  color: #e6e6e6;
+  display: block;
+  float: left;
+  font-weight: 700;
+  padding: 10px 14px 10px 34px;
+  text-decoration: none;
+}
+/* line 87, ../sass/gt_ct_super_block.scss */
+.super-block__jump-link a:link, .super-block__jump-link a:visited, .super-block__jump-link a:hover, .super-block__jump-link a:active {
+  color: #fff;
+  text-decoration: none;
+}
+/* line 91, ../sass/gt_ct_super_block.scss */
+.super-block__jump-link a:before {
+  font-family: "FontAwesome";
+  font-size: 1.4em;
+  color: #eeb211;
+  content: "\f0a9";
+  display: inline-block;
+  left: 10px;
+  position: absolute;
+  top: 6px;
+}
+/* line 102, ../sass/gt_ct_super_block.scss */
+.sb-skin-blue .super-block__jump-link a {
+  background-color: #023d7b;
+  color: #fff;
+}
+/* line 105, ../sass/gt_ct_super_block.scss */
+.sb-skin-blue .super-block__jump-link a:hover {
+  color: #fff;
+}
+/* line 107, ../sass/gt_ct_super_block.scss */
+.sb-skin-gold .super-block__jump-link a {
+  background-color: #eeb211;
+  color: #fff;
+}
+/* line 110, ../sass/gt_ct_super_block.scss */
+.sb-skin-gold .super-block__jump-link a:before {
+  color: #023d7b;
+}
+/* line 112, ../sass/gt_ct_super_block.scss */
+.super-block__image .super-block__jump-link {
+  bottom: -1px;
+  font-size: .86em;
+  margin: 0;
+  position: absolute;
+  right: 0;
+}
+/* line 118, ../sass/gt_ct_super_block.scss */
+.super-block__image .super-block__jump-link a {
+  background-color: #fff;
+  -webkit-border-radius: 5px 0 0 0;
+  -moz-border-radius: 5px 0 0 0;
+  -ms-border-radius: 5px 0 0 0;
+  -o-border-radius: 5px 0 0 0;
+  border-radius: 5px 0 0 0;
+  color: #646464;
+  display: block;
+  filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=90);
+  opacity: 0.9;
+  padding: 8px 10px 8px 28px;
+}
+/* line 125, ../sass/gt_ct_super_block.scss */
+.super-block__image .super-block__jump-link a:hover {
+  color: #454545;
+}
+/* line 126, ../sass/gt_ct_super_block.scss */
+.super-block__image .super-block__jump-link a:before {
+  font-size: 1.3em;
+  left: 8px;
+  top: 6px;
+}
+/* line 133, ../sass/gt_ct_super_block.scss */
+.sb-skin-blue .super-block__image .super-block__jump-link a {
+  background-color: #023d7b;
+  color: #7fbdff;
+  filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=100);
+  opacity: 1;
+}
+/* line 137, ../sass/gt_ct_super_block.scss */
+.sb-skin-blue .super-block__image .super-block__jump-link a:hover {
+  color: #fff;
+}
+/* line 139, ../sass/gt_ct_super_block.scss */
+.sb-skin-gold .super-block__image .super-block__jump-link a {
+  background-color: #eeb211;
+  color: #fff;
+  filter: progid:DXImageTransform.Microsoft.Alpha(Opacity=100);
+  opacity: 1;
+}
+/* line 143, ../sass/gt_ct_super_block.scss */
+.sb-skin-gold .super-block__image .super-block__jump-link a:hover {
+  color: #fff;
+}

@@ -1,0 +1,8 @@
+vendor/
+
+.idea
+
+*.sql
+*.gz
+*.mysql
+*.zip

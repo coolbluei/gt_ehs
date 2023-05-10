@@ -1,0 +1,717 @@
+<?php
+
+/**
+ * GT Tools
+ *
+ * @file    gt_tools.module
+ * @author  Fletcher Moore <fletch@gatech.edu>
+ *
+ * @TODO Access restrictions
+ */
+
+/**
+ * Implements hook_permission().
+ *
+ * Defines a new permission called 'my custom permission'.
+ */
+function gt_tools_permission() {
+  return array(
+    'access gt_tools' => array(
+      'title' => t('Access GT Tools'),
+      'description' => t('Allows users to access GT Tools menu.'),
+    ),
+    'add gt_tools block_class' => array(
+      'title' => t('Add Block Style Class in GT Tools'),
+      'description' => t('Allows users to add a block styles class in GT Tools.'),
+    ),
+    'edit gt_tools block_class' => array(
+      'title' => t('Edit Block Style Classes in GT Tools'),
+      'description' => t('Allows users to edit block style classes in GT Tools.'),
+    ),
+    'delete gt_tools block_class' => array(
+      'title' => t('Delete Block Style Classes in GT Tools'),
+      'description' => t('Allows users to delete block style classes in GT Tools.'),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function gt_tools_menu() {
+  $items = array();
+
+  $items['admin/config/system/gt'] = array(
+    'title' => 'GT Tools',
+    'page callback' => 'gt_tools_config',
+    'access arguments' => array('access gt_tools'),
+  );
+
+  $items['admin/config/system/gt/class/add'] = array(
+    'title' => 'Add block style class',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gt_tools_block_class_edit'),
+    'access arguments' => array('add gt_tools block_class'),
+    'type' => MENU_LOCAL_ACTION,
+  );
+
+  $items['admin/config/system/gt/class/edit/%class'] = array(
+    'title' => 'Edit block style class',
+    'page callback' => 'gt_tools_block_class_page',
+    'page arguments' => array(6),
+    'access arguments' => array('edit gt_tools block_class'),
+  );
+
+  $items['admin/config/system/gt/class/delete/%class'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gt_tools_block_class_delete_confirm', 6),
+    'access arguments' => array('delete gt_tools block_class'),
+  );
+
+  return $items;
+}
+
+/**
+ * Class wildcard handler
+ * @param $cid
+ * @return mixed
+ */
+function class_load($cid) {
+  $class = db_select('block_classes', 'bc')
+      ->fields('bc')
+      ->condition('cid', $cid)
+      ->execute()
+      ->fetchAssoc();
+  return $class;
+}
+
+
+
+/**
+ * Configuration form for GT Tools
+ */
+function gt_tools_config() {
+  $query = db_select('block_classes', 'bc')
+      ->fields('bc')
+      ->execute();
+  while ($result = $query->fetchAssoc()) {
+    $rows[$result['cid']] = array(
+      $result['name'],
+      $result['description'],
+      l('edit', 'admin/config/system/gt/class/edit/' . $result['cid']) . ' | ' . l('delete', 'admin/config/system/gt/class/delete/' . $result['cid']),
+    );
+  }
+
+  if (isset($rows)) {
+    $table = array(
+      '#theme' => 'table',
+      '#header' => array('Name', 'Description', 'Operations'),
+      '#rows' => $rows,
+    );
+  } else {
+    $table = '<p>There are no block style classes defined.</p>';
+  }
+
+  $content['class_table'] = array(
+    '#markup' => render($table),
+  );
+  return $content;
+}
+
+/**
+ * Callback for block class edit page
+ *
+ * @param $class
+ * @return array|mixed
+ */
+function gt_tools_block_class_page($class) {
+  return drupal_get_form('gt_tools_block_class_edit', $class);
+}
+
+/**
+ * Block class edit form
+ *
+ * @param $form
+ * @param $form_state
+ * @param null $class
+ * @return mixed
+ */
+function gt_tools_block_class_edit($form, $form_state, $class = NULL) {
+  $form['cid'] = array('#type' => 'value', '#value' => $class['cid']);
+
+  $form['class_name'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Class name',
+    '#description' => 'Must begin with a letter and contain only numbers, lowercase letters, hyphens, or underscores.',
+    '#default_value' => isset($class['name']) ? $class['name'] : '',
+  );
+
+  $form['class_description'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Class description',
+    '#description' => 'This field is for administrative purposes only.',
+    '#default_value' => isset($class['description']) ? $class['description'] : '',
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Save class',
+  );
+
+  return $form;
+}
+
+/**
+ * Validation for block edit form
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_block_class_edit_validate($form, $form_state) {
+  if ($form_state['input']['class_name'] == '') {
+    form_set_error('class_name', 'You must enter a class name.');
+  }
+  if (!preg_match('/^[a-z][a-z0-9-_]*/', $form_state['input']['class_name'])) {
+    form_set_error('class_name', 'The class name is invalid.');
+  }
+  if (!isset($form_state['values']['cid'])) {
+    if (db_select('block_classes', 'bc')
+            ->fields('bc')
+            ->condition('name', $form_state['input']['class_name'], 'LIKE')
+            ->execute()
+            ->rowCount() > 0) {
+      form_set_error('class_name', 'The class you have entered already exists.');
+    }
+  }
+  if ($form_state['input']['class_description'] == '') {
+    form_set_error('class_description', 'You must enter a class description.');
+  }
+}
+
+/**
+ * Submit for block edit form
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_block_class_edit_submit($form, $form_state) {
+  if (isset($form_state['values']['cid'])) {
+    db_update('block_classes')
+        ->fields(array('name' => $form_state['input']['class_name'], 'description' => $form_state['input']['class_description']))
+        ->condition('cid', $form_state['values']['cid'])
+        ->execute();
+  } else {
+    db_insert('block_classes')
+        ->fields(array('name' => $form_state['input']['class_name'], 'description' => $form_state['input']['class_description']))
+        ->execute();
+  }
+
+  drupal_set_message(t('The class @class_name has been saved.', array('@class_name' => $form_state['input']['class_name'])));
+  drupal_goto('admin/config/system/gt');
+}
+
+/**
+ * Confirm deletion of a block class.
+ *
+ * @param $form
+ * @param $form_state
+ * @param $class
+ * @return mixed
+ */
+function gt_tools_block_class_delete_confirm($form, &$form_state, $class) {
+  $form['cid'] = array('#type' => 'value', '#value' => $class['cid']);
+  $form['name'] = array('#type' => 'value', '#value' => $class['name']);
+  $message = t('Are you sure you want to delete the class %class?', array('%class' => $class['name']));
+  return confirm_form($form, $message, 'admin/config/system/gt', NULL, t('Delete'));
+}
+
+/**
+ * Delete selected block classes.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_block_class_delete_confirm_submit($form, $form_state) {
+  db_delete('block_classes')
+      ->condition('cid', $form['cid']['#value'])
+      ->execute();
+  db_delete('block_classes_data')
+      ->condition('cid', $form['cid']['#value'])
+      ->execute();
+  drupal_set_message(t('Class %class deleted.', array('%class' => $form['name']['#value'])));
+  drupal_goto('admin/config/system/gt');
+}
+
+
+
+/**
+ * Implementation of hook_form_alter(). In the case of the menu_edit_item form, check whether the limit on GT menus has
+ * been reached, and disallow adding menu items after that.
+ */
+function gt_tools_form_alter(&$form, &$form_state, $form_id) {
+  switch ($form_id) {
+    case 'menu_edit_item':
+      gt_tools_menu_edit_item($form, $form_state);
+      break;
+    case 'menu_item_delete_form':
+      if ($form_state['build_info']['args'][0]['menu_name'] == 'gt-social-media') {
+        $form['#submit'][] = 'gt_tools_item_delete_submit';
+      }
+      break;
+    case 'block_admin_configure':
+    case 'block_add_block_form':
+      gt_tools_block_form($form, $form_state);
+      break;
+    case 'block_custom_block_delete':
+      $form['#submit'][] = 'gt_tools_block_delete_form_submit';
+      break;
+  }
+}
+
+/**
+ * Add structural and stylistic class options to block configuration form.
+ */
+function gt_tools_block_form(&$form, &$form_state) {
+  if (count($form_state['build_info']['args']) > 0) {
+    $classes = gt_tools_get_block_classes($form_state['build_info']['args'][0], $form_state['build_info']['args'][1]);
+    $layout = gt_tools_get_layout($form_state['build_info']['args'][0], $form_state['build_info']['args'][1]);
+  }
+
+  $form['visibility_title']['#weight'] = 10;
+  $form['visibility']['#weight'] = 11;
+
+  $form['layout'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Layout',
+    '#weight' => 1,
+  );
+
+  $form['layout']['layout_class'] = array(
+    '#type' => 'select',
+    '#options' => array(
+      'full-width' => 'Full width',
+      'three-quarter-width' => 'Three quarter width',
+      'two-thirds-width' => 'Two thirds width',
+      'half-width' => 'Half width',
+      'third-width' => 'One third width',
+      'quarter-width' => 'One quarter width',
+    ),
+    '#empty_value' => '',
+    '#default_value' => isset($layout['class']) ? $layout['class'] : '',
+  );
+
+  $available_classes = gt_tools_get_all_block_classes();
+  if (!empty($available_classes)) {
+    $form['styling'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Styling',
+      '#weight' => 2,
+    );
+
+    $form['styling']['styling_classes'] = array(
+      '#type' => 'checkboxes',
+      '#options' => $available_classes,
+      '#empty_value' => '',
+      '#default_value' => isset($classes) ? $classes : array(),
+    );
+  }
+
+  $form['layout']['clearfix'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Clear floats'),
+    '#default_value' => isset($layout['clearfix']) ? $layout['clearfix'] : '',
+  );
+
+  $form['#submit'][] = 'gt_tools_block_form_submit';
+}
+
+/**
+ * Custom submit handler for block configuration form
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_block_form_submit($form, $form_state) {
+  if (isset($form_state['values']['styling_classes'])) {
+    $classes = gt_tools_get_all_block_classes(TRUE);
+    foreach ($form_state['values']['styling_classes'] as $key => $class) {
+      if ($class) {
+        $query = db_merge('block_classes_data')
+            ->fields(array(
+          'cid' => $classes[$class],
+          'module' => $form_state['values']['module'],
+          'delta' => $form_state['values']['delta'],
+        ));
+
+        $query->key(array(
+          'cid' => $classes[$class],
+          'module' => $form_state['values']['module'],
+          'delta' => $form_state['values']['delta'],
+        ));
+
+        $query->execute();
+      } else {
+        db_delete('block_classes_data')
+            ->condition('cid', $classes[$key])
+            ->condition('module', $form_state['values']['module'])
+            ->condition('delta', $form_state['values']['delta'])
+            ->execute();
+      }
+    }
+  }
+
+  $query = db_merge('block_layout')
+      ->fields(array(
+    'class' => $form_state['values']['layout_class'],
+    'clearfix' => $form_state['values']['clearfix'],
+    'module' => $form_state['values']['module'],
+    'delta' => $form_state['values']['delta'],
+  ));
+
+  $query->key(array(
+    'module' => $form_state['values']['module'],
+    'delta' => $form_state['values']['delta'],
+  ));
+
+  $query->execute();
+}
+
+/**
+ * Delete classes when blocks are deleted.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_block_delete_form_submit($form, $form_state) {
+  db_delete('block_classes_data')
+      ->condition('module', $form_state['build_info']['args'][0])
+      ->condition('delta', $form_state['build_info']['args'][1])
+      ->execute();
+  db_delete('block_layout')
+      ->condition('module', $form_state['build_info']['args'][0])
+      ->condition('delta', $form_state['build_info']['args'][1])
+      ->execute();
+}
+
+/**
+ * Extend block's classes with any user defined classes.
+ *
+ * @param $vars
+ */
+function gt_tools_preprocess_block(&$vars) {
+  $block = $vars['block'];
+  $classes = gt_tools_get_block_classes($block->module, $block->delta);
+  $layout_raw = gt_tools_get_layout($block->module, $block->delta);
+  $vars['classes_array'] = array_merge($vars['classes_array'], $classes, (array) array($layout_raw['class'], $layout_raw['clearfix'] ? 'row-break' : ''));
+}
+
+
+
+/**
+ * Helper function: retrieve all available block classes by name or by cid
+ *
+ * @param $cid_keys
+ * @return mixed
+ */
+function gt_tools_get_all_block_classes($cid_keys = FALSE) {
+  $query = db_select('block_classes', 'bc')
+      ->fields('bc')
+      ->execute();
+  $classes = array();
+  while ($result = $query->fetchAssoc()) {
+    if ($cid_keys) {
+      $classes[$result['name']] = $result['cid'];
+    } else {
+      $classes[$result['name']] = $result['description'];
+    }
+  }
+  return $classes;
+}
+
+/**
+ * Helper function: return classes belonging to a specific block.
+ *
+ * @param $module
+ * @param $delta
+ * @return mixed
+ */
+function gt_tools_get_block_classes($module, $delta) {
+  $query = db_select('block_classes_data', 'bcd');
+  $query->join('block_classes', 'bc', 'bcd.cid = bc.cid');
+  $query->fields('bc', array('name'));
+  $result = $query->condition('module', $module)
+      ->condition('delta', $delta)
+      ->execute();
+  $classes = array();
+  while ($class = $result->fetchField()) {
+    $classes[] = $class;
+  }
+  return $classes;
+}
+
+/**
+ * Helper function: return layout info belong to a specific block.
+ *
+ * @param $module
+ * @param $delta
+ * @return mixed
+ */
+function gt_tools_get_layout($module, $delta) {
+  $layout = db_select('block_layout', 'bl')
+      ->fields('bl', array('class', 'clearfix'))
+      ->condition('module', $module)
+      ->condition('delta', $delta)
+      ->execute()
+      ->fetchAssoc();
+
+  return $layout;
+}
+
+
+
+/**
+ * Implementation of hook_page_build(). Used to add GT menu specific instructions to menu management pages.
+ *
+ * @param $page
+ */
+function gt_tools_page_build(&$page) {
+  switch (arg(4)) {
+    case 'gt-action-items':
+      $instructions = '<p>' . t('Action items will be displayed to the right of the main menu. You may create up to three.') . '<p>';
+      break;
+    case 'gt-social-media':
+      $instructions = '<p>' . t('Social media links will be displayed in the upper right corner of the page. Icons will be automatically supplied based on social media service you select for each link.') . '<p>';
+      break;
+    case 'gt-footer-links-1':
+    case 'gt-footer-links-2':
+    case 'gt-footer-links-3':
+      $instructions = '<p>' . t('Resource links will be displayed between the Georgia Tech Resources menu and the Georgia Tech map. You may include up to 25 items in each menu. Menus may be interspersed with non-linked headers by using the !special-menu-items module.', array('!special-menu-items' => l(t('Special Menu Items'), 'https://drupal.org/project/special_menu_items'))) . '</p>';
+      break;
+    case 'gt-footer-utility-links':
+      $instructions = '<p>' . t('Footer utility links will be displayed in the bottom-most footer, just above the emgergency, legal, and accountability links.');
+      break;
+  }
+  if (isset($instructions)) { $page['content']['instructions'] = array('#markup' => $instructions); }
+}
+
+/**
+ * Handle editing of social media links.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_menu_edit_item(&$form, &$form_state) {
+  // menu edit form
+  if (arg(3) == 'item') {
+    // Menu item being edited.
+    if ($form_state['build_info']['args'][1]['menu_name'] == 'gt-social-media') {
+      //Editing social media link. Get the form.
+      gt_tools_social_media_form($form);
+    }
+  } else {
+    // Menu item being added.
+    $menu = arg(4);
+    $op = arg(5);
+    $form_fields = array('link_title', 'link_path', 'description', 'enabled', 'expanded', 'parent', 'weight', 'actions');
+    $gtforms = array('gt-action-items' => 3, 'gt-footer-links-1' => 25, 'gt-footer-links-2' => 25, 'gt-footer-links-3' => 25);
+
+    // Handle users trying to overstuff GT menus.
+    if (array_key_exists($menu, $gtforms) && $op == 'add') {
+      // Limited GT form being added
+      if (count(array_filter(menu_tree_page_data($menu), 'gt_tools_item_is_enabled')) == $gtforms[$menu]) {
+        // No more room in the menu, so...
+        // Unset all the form fields.
+        foreach ($form_fields as $field) {
+          $form[$field]['#disabled'] = TRUE;
+        }
+        // And present a disclaimer.
+        drupal_set_message(t("Sorry, you've reached the item limit (@limit) for this menu. Please delete !listlinks first.",
+          array('@limit' => $gtforms[$menu], '!listlinks' => l(t('an existing link'), 'admin/structure/menu/manage/' . $menu))), 'error');
+      }
+    }
+
+    // Handle GT social media menu
+    if ($menu == 'gt-social-media') {
+      // Add social media fields.
+      gt_tools_social_media_form($form);
+    }
+  }
+}
+
+/**
+ * Generate form elements specific to social media menu items.
+ *
+ * @param $form
+ */
+function gt_tools_social_media_form(&$form) {
+  $icon = db_select('menu_icons', 'mi')
+      ->fields('mi')
+      ->execute()
+      ->fetchAssoc();
+
+  $form['social_media_presets'] = array(
+    '#type' => 'select',
+    '#title' => 'Social media service.',
+    '#required' => TRUE,
+    '#attributes' => array(
+      'id' => 'social-media-presets',
+    ),
+    '#options' => gt_tools_social_media_presets(),
+    '#empty_value' => '',
+    '#default_value' => $icon['preset'],
+    '#weight' => -10,
+    '#attached' => array(
+      'js' => array(
+        drupal_get_path('module', 'gt_tools') . '/js/gt_tools.js',
+      ),
+    ),
+  );
+
+  $form['link_title']['#weight'] = -5;
+  $form['link_path']['#weight'] = -4;
+
+  $form['social_media_icons'] = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'id' => 'social-media-icon',
+    ),
+    '#weight' => -1,
+  );
+  /*
+    Shit is fucking broken and we probably don't have time to fix it.
+    $form['social_media_icons']['upload'] = array(
+    '#type' => 'managed_file',
+    '#title' => t('Icon'),
+    '#description'   => t('Icons must be in .png format, and be 30 pixels square.'),
+    '#required' => FALSE,
+    '#upload_location' => file_default_scheme() . '://icons',
+    //'#default_value' => theme_get_setting('gt_logo_upload_file'),
+    '#upload_validators' => array(
+    'file_validate_extensions' => array('png'),
+    'file_validate_image_resolution' => array('30x30', '30x30'),
+    ),
+    );
+   */
+
+  $form['#submit'][] = 'gt_tools_icon_submit';
+}
+
+/**
+ * Handle social media icon uploads
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_icon_submit($form, $form_state) {
+  // Save icon data in db.
+
+  $result = db_select('menu_icons', 'mi')
+      ->fields('mi')
+      ->condition('mlid', $form_state['values']['mlid'])
+      ->execute();
+  if ($result->rowCount() > 0) {
+    // We are updating an existing row.
+    db_update('menu_icons')
+        ->fields(array(
+          'preset' => $form_state['values']['social_media_presets'],
+        ))
+        ->condition('mlid', $form_state['values']['mlid'])
+        ->execute();
+  } else {
+    // New row
+    db_insert('menu_icons')
+        ->fields(array(
+          'mlid' => $form_state['values']['mlid'],
+          'preset' => $form_state['values']['social_media_presets'],
+        ))
+        ->execute();
+  }
+}
+
+/**
+ * Delete menu_icon data where appropriate.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function gt_tools_item_delete_submit($form, $form_state) {
+  db_delete('menu_icons')
+      ->condition('mlid', $form_state['build_info']['args'][0]['mlid'])
+      ->execute();
+}
+
+/**
+ * Callback to determine if a particular menu item is enabled or not.
+ *
+ * @param $var
+ *
+ * @return BOOLEAN
+ */
+function gt_tools_item_is_enabled($var) {
+  return !$var['link']['hidden'];
+}
+
+/**
+ * Data to populate social media preset selector
+ *
+ * @return array of social media preset names
+ */
+function gt_tools_social_media_presets() {
+  return array(
+    'facebook' => 'Facebook',
+    'flickr' => 'Flickr',
+    'googleplus' => 'Google Plus',
+    'instagram' => 'Instagram',
+    'linkedin' => 'LinkedIn',
+    'pinterest' => 'Pinterest',
+    'rss' => 'RSS',
+    'twitter' => 'Twitter',
+    'youtube' => 'YouTube',
+  );
+}
+
+/**
+ * Implements hook_menu_minipanels_styles().
+ */
+function gt_tools_menu_minipanels_styles() {
+  $styles = array(
+    'gtstyle' => t('GT'),
+  );
+  return $styles;
+}
+
+/**
+ * Implements hook_menu_minipanels_style().
+ */
+function gt_tools_menu_minipanels_style($menu_config) {
+  // Load the custom styles in the footer but after other things have loaded.
+  drupal_add_js(drupal_get_path('module', 'gt_tools') . '/js/gt_tools_menu_minipanels_style.js', array('scope' => 'footer', 'weight' => 100));
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for system_theme_settings().
+ *
+ * Workaround for bug <a href="https://drupal.org/node/1862892." title="https://drupal.org/node/1862892." rel="nofollow">https://drupal.org/node/1862892.</a>
+ */
+function gt_tools_form_system_theme_settings_alter($form, &$form_state) {
+  if ($form['var']['#value'] != 'theme_settings') {
+    $key = preg_replace(array('/^theme_/', '/_settings$/'), '', $form['var']['#value']);
+    $themes = list_themes();
+
+    if (isset($themes[$key]->base_themes)) {
+      $theme_keys = array_keys($themes[$key]->base_themes);
+      $theme_keys[] = $key;
+    }
+    else {
+      $theme_keys = array($key);
+    }
+
+    foreach ($theme_keys as $theme) {
+      $theme_path = drupal_get_path('theme', $theme);
+      if (file_exists($theme_path . '/theme-settings.php')) {
+        $form_state['build_info']['files'][] = $theme_path . '/theme-settings.php';
+      }
+    }
+  }
+}

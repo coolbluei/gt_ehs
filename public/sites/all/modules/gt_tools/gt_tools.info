@@ -1,0 +1,9 @@
+name = GT Tools
+description = "A suite of tools for sites using the GT theme. <em>Required</em> for GT theme users."
+core = 7.x
+version = "7.x-2.9"
+package = GT
+dependencies[] = block
+dependencies[] = menu
+project = "gt_tools"
+project status url = http://drupal.gatech.edu/release_history/gt_tools/7.x

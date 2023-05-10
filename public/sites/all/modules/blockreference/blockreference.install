@@ -1,0 +1,141 @@
+<?php
+
+/**
+ * @file
+ * Block Reference install & updates.
+ */
+
+/**
+ * Convert bid storage to module/delta storage.
+ */
+function blockreference_update_7200() {
+  $old_schema = drupal_get_schema(NULL, TRUE);
+  // Find fields & tables.
+  $all_fields = field_info_field_map();
+  $alter_tables = array();
+  foreach ($all_fields as $field_name => $field) {
+    if ($field['type'] == 'blockreference') {
+      $table_name = 'field_data_' . $field_name;
+      $alter_tables[$table_name] = $field_name;
+      $revision_table_name = 'field_revision_' . $field_name;
+      if (isset($old_schema[$revision_table_name])) {
+        $alter_tables[$revision_table_name] = $field_name;
+      }
+    }
+  }
+  $col_spec = array(
+    'type' => 'varchar',
+    'length' => 129, // 4 x 32 + 1 should be enough
+    'not null' => TRUE,
+    'default' => '',
+  );
+  $invalid_bids = array();
+  foreach ($alter_tables as $table_name => $field_name) {
+    $column_bid = $field_name . '_bid';
+    $column_moddelta = $field_name . '_moddelta';
+    // Alter table columns.
+    db_add_field($table_name, $column_moddelta, $col_spec);
+    // Convert bids to moddeltas.
+    db_query("
+      UPDATE {{$table_name}}
+      SET
+        $column_moddelta = (SELECT CONCAT(module, ':', delta) FROM {block} WHERE bid = {{$table_name}}.$column_bid)
+      WHERE
+        $column_bid IN (SELECT bid FROM {block})
+    ")->execute();
+    $invalid_bids = array_merge(
+      $invalid_bids,
+      array_values(db_query("
+        SELECT $column_bid
+        FROM {{$table_name}}
+        WHERE $column_moddelta = ''
+      ")->fetchCol(0, 0))
+    );
+    // Alter table columns.
+    db_drop_field($table_name, $column_bid);
+    // Alter table columns.
+    db_add_index($table_name, 'moddelta', array($column_moddelta));
+  }
+  if ($invalid_bids) {
+    $invalid_bids = array_unique($invalid_bids);
+    drupal_set_message(format_string("@num block ids could not be converted, because they don't exist (anymore).", array(
+      '@num' => count($invalid_bids),
+    )), 'warning');
+  }
+}
+
+/**
+ * Convert field default values to module/delta format.
+ */
+function blockreference_update_7201() {
+  $all_fields = field_info_field_map();
+  foreach ($all_fields as $field_name => $field_info) {
+    if ($field_info['type'] == 'blockreference') {
+      $field = field_info_field($field_name);
+
+      foreach ($field_info['bundles'] as $entity_type => $bundles) {
+        foreach ($bundles as $bundle) {
+          $instance = field_info_instance($entity_type, $field_name, $bundle);
+          if (!empty($instance['default_value'])) {
+            $needs_update = FALSE;
+
+            foreach ($instance['default_value'] as $delta => $default) {
+              if (isset($default['bid'])) {
+                // Convert any existing bid defaults to a moddelta.
+                if (!empty($default['bid'])) {
+                  $q = db_query("SELECT CONCAT(module, ':', delta) FROM {block} WHERE bid = :bid", array(
+                    ':bid' => $default['bid'],
+                  ));
+                  $instance['default_value'][$delta]['moddelta'] = $q->fetchField();
+                  $instance['default_value'] = _field_filter_items($field, $instance['default_value']);
+                }
+
+
+                // Remove any default bid property entirely, even if empty.
+                unset($instance['default_value'][$delta]['bid']);
+                $needs_update = TRUE;
+              }
+            }
+
+            if ($needs_update) {
+              field_update_instance($instance);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Remove old bid index and ensure the moddelta one exists in the field record.
+ */
+function blockreference_update_7202() {
+  $all_fields = field_info_field_map();
+  foreach ($all_fields as $field_name => $field_info) {
+    if ($field_info['type'] == 'blockreference') {
+      $field = field_info_field($field_name);
+
+      $needs_update = FALSE;
+      $indexes = $field['indexes'];
+      foreach ($field['indexes'] as $index_name => $index) {
+        if ($index && count($index) === 1 && reset($index) === 'bid') {
+          unset($indexes[$index_name]);
+          $needs_update = TRUE;
+        }
+      }
+      $field['indexes'] = $indexes;
+
+      // If the table got dropped before it could be re-created, create it now.
+      if (!db_table_exists(_field_sql_storage_tablename($field))) {
+        $storage_type = field_info_storage_types($field['storage']['type']);
+        module_invoke($storage_type['module'], 'field_storage_create_field', $field);
+        $needs_update = TRUE;
+      }
+
+      if ($needs_update) {
+        field_update_field($field);
+      }
+    }
+  }
+}

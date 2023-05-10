@@ -1,0 +1,6 @@
+GT Theme 7.x-1.1-beta2, 2014-12-17
+----------------------------------
+- Added CHANGELOG.txt file
+- Added project config to .info file for update maintenance
+- Fixed strict warning error about variables being passed by reference when images are used
+- Fixed link issue with titles and images (converted to using Drupal "l" function)

@@ -1,0 +1,247 @@
+/**
+ * @file
+ * Main CSS Styles for Georgia Tech's gt_subtheme
+ * Please overwrite this with your gt_subtheme styles at the bottom.
+ */
+
+/************************************/
+/*   General Layout styles        */
+/************************************/
+
+/* only for certain pages, when there are too many breadcrumbs */
+/* list which pages, then change to 30px */
+/* #main { padding-top: 0px; } */
+/* Compensating for negative margin in masthead */
+
+/************************************/
+/*    User Editing improvements     */
+/************************************/
+body.page-node-add .form-item .description {
+	font-size:1.25em;
+}
+
+body.section-forms #block-system-main .field-item, body.section-forms #block-system-main .field-label {
+	font-size:1.25em;
+}
+
+/*
+REMOVED
+,
+fieldset#edit-body-und-0-format,
+fieldset#edit-field-body-1-und-0-format,
+fieldset#edit-field-body-2-und-0-format,
+fieldset#edit-field-body-3-und-0-format
+*/
+
+div.form-item-log,
+.preview h3,
+.preview .node-teaser,
+body.page-admin-structure-block-add .form-item-regions-seven,
+body.page-admin-structure-block-manage-block .form-item-regions-seven
+{
+  display: none;
+}
+
+/************************************/
+/*   Don't Show 2nd Level in Top Menu   */
+/************************************/
+
+#primary-menus #main-menu-wrapper li ul li ul li {
+  display: none;
+}
+
+/************************************/
+/*   Make Contact page (view) show columns based on screen size   */
+/************************************/
+
+/**
+ * Media Query Breakpoints
+ *
+ * Breakpoints are calculated based on a browser default font-size of 16px and NOT what the base
+ * font-size is set to be (which is ~14px in this case of this page.) Plus, if the user decides to
+ * increase their default font size for their browser the layout will drop down to a lower
+ * breakpoint (provided font size is increased enough), thus making for a more usable page!
+ */
+
+/* ~496px and less */
+@media only screen and (max-width: 31em) {
+  .view-id-personnel_list .views-column {
+    float: left;
+    width: 100%;
+    margin: 0.5em;
+    overflow: hidden;
+}
+  
+}
+
+/* ~496px to ~816px */
+@media only screen and (min-width: 31em) and (max-width: 51em) {
+  .view-id-personnel_list .views-column {
+    float: left;
+    width: 49%;
+    margin: 0.5em;
+    overflow: hidden;
+}
+  
+}
+
+/* ~816px or more */
+@media only screen and (min-width: 51em) {
+  .view-id-personnel_list .views-column {
+    float: left;
+    width: 30%;
+    margin: 0.5em;
+    overflow: hidden;
+}
+  
+}
+
+/* ~1024px or more */
+@media only screen and (min-width: 64em) {
+  .view-id-personnel_list .views-column {
+    float: left;
+    width: 30%;
+    margin: 0.5em;
+    overflow: hidden;
+}
+  
+}
+
+ .view-id-personnel_list .views-row {
+     height: 440px;
+}
+
+/************************************/
+/*   making Hg events pretty    */
+/************************************/
+
+div.content.block-body.clearfix {
+background-color: #fff;
+}
+ul.hg-feed.hg-feed-list {
+padding-left: 0px;
+margin-top: 0px;
+margin-bottom: 0px;
+}
+.hg-feed-item img {
+float: left;
+margin: 0 20px 0 0;
+}
+.hg-feed-event {
+width: 6em;
+padding: 0.2em;
+box-shadow: 0px;
+border-radius: 0px;
+border: 1px #a9aaae solid;
+border-top: solid 0.5em rgba(0,37,76,0.5);
+margin-right: 2em;
+min-height: 5.5em;
+font-weight: normal;
+margin-bottom: 10px;
+}
+.hg-feed-event-month {
+margin-top: 0.55em;
+margin-left: auto;
+margin-right: auto;
+font-size: 1em;
+text-transform: uppercase;
+line-height: 1.5em;
+display: block;
+width: 100%;
+}
+.hg-feed-event-day {
+font-size: 1.5em;
+padding: 0;
+display: block;
+width: 100%;
+margin-top: 0;
+}
+.hg-feed-list .hg-feed-item h3 {
+font-size: 1.1em;
+}
+.hg-feed-list {
+margin-top: 20px;
+}
+.hg-feed-list .hg-feed-item h3 a {
+text-decoration: none;
+}
+.pane-hg-reader-1  .pane-title {
+background-color: #EEB211;
+}
+.pane-hg-reader-2 .pane-title {
+background-color: #EEB211;
+}
+body.node-type-multipurpose-page .articles {
+background-color: #FFFFFF;
+}
+
+/************************************/
+/*   Separate Super blocks        */
+/************************************/
+
+.nodeblock-gt-ct-super-block {
+padding: 10px 10px 0px 10px;
+border: 5px solid white;
+background-color: #efefef;
+}
+
+.articles {
+padding: 0px;
+margin: 20px 10px 10px 10px white;
+}
+
+/************************************/
+/*   Front page formatting       */
+/************************************/
+
+body.page-node-1 div.block-row {
+background-color: #FFFFFF;
+}
+
+body.page-node-1.node-type-horizontal-landing-page #content div.row-content {
+margin-bottom: 20px;
+}
+
+/************************************/
+/*        FAQ formatting            */
+/************************************/
+
+div.views-field-field-question {
+font-weight: bold;
+}
+
+/************************************/
+/*   Offices/Services bkg          */
+/************************************/
+
+div#node-2 .block-row {
+  background-color: white;
+}
+
+/*********************************************************************/
+/*   Change text color from white to not white in header of tables   */
+/*********************************************************************/
+
+table thead tr th label {
+	color: black;
+}
+
+table thead tr th p {
+	color: black;
+}
+
+table tbody tr th {
+	color: black;
+}
+
+table thead tr th {
+	color: black;
+}
+
+/*********************************************************************/
+/*   Remove dates from Mercury events while they are not working     */
+/*********************************************************************/
+
+DIV.hg-feed-event {
+  visibility: hidden;
+}

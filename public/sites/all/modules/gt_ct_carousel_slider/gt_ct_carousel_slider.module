@@ -1,0 +1,100 @@
+<?php
+
+/**
+ * @file
+ * Code for the GT Carousel Slider feature.
+ */
+include_once 'gt_ct_carousel_slider.features.inc';
+
+/**
+ * Registering template files.
+ *
+ * @param $theme_registry
+ *   An array keyed by theme hook name containing information returned from hook_theme()
+ */
+function gt_ct_carousel_slider_theme_registry_alter(&$theme_registry) {
+  $theme_registry['template-file']['path'] = drupal_get_path('module', 'gt_ct_carousel_slider') . "/templates/";
+}
+
+/**
+ * Override or insert variables into the block templates.
+ *
+ * @param $variables
+ *   An array of variables to pass to the theme template.
+ */
+function gt_ct_carousel_slider_preprocess_node(&$variables) {
+
+  $node = $variables['elements']['#node'];
+
+  if ($node->type == 'gt_ct_carousel_slide') {
+
+    // slide title
+    if (!empty($node->field_gtct_cs_title)) {
+      $field_gtct_cs_title = field_get_items('node', $node, 'field_gtct_cs_title');
+      $variables['gt_ct_cs_slide_title'] = $field_gtct_cs_title[0]['safe_value'];
+    }
+    else {
+      $variables['gt_ct_cs_slide_title'] = FALSE;
+    }
+
+    // summary sentence
+    if (!empty($node->field_gtct_cs_summary_sentence)) {
+      $field_gtct_cs_summary_sentence = field_get_items('node', $node, 'field_gtct_cs_summary_sentence');
+      $variables['gt_ct_cs_slide_title_summary_sentence'] = $field_gtct_cs_summary_sentence[0]['safe_value'];
+    }
+    else {
+      $variables['gt_ct_cs_slide_title_summary_sentence'] = FALSE;
+    }
+
+    // slide title graphic
+    if (!empty($node->field_gtct_cs_title_graphic)) {
+      $field_gtct_cs_title_graphic = field_get_items('node', $node, 'field_gtct_cs_title_graphic');
+      $variables['gt_ct_cs_slide_title_graphic_url'] = image_style_url('slide_overlay_image', $field_gtct_cs_title_graphic[0]['uri']);
+      $variables['gt_ct_cs_slide_title_graphic_alt'] = $field_gtct_cs_title_graphic[0]['alt'];
+    }
+    else {
+      $variables['gt_ct_cs_slide_title_graphic_url'] = FALSE;
+    }
+
+    // slide title placement
+    $field_gtct_cs_title_placement = field_get_items('node', $node, 'field_gtct_cs_title_placement');
+    $variables['gt_ct_cs_slide_title_placement'] = $field_gtct_cs_title_placement[0]['value'];
+
+    // background image
+    if (!empty($node->field_gtct_cs_bg_image)) {
+      $field_gtct_cs_bg_image = field_get_items('node', $node, 'field_gtct_cs_bg_image');
+      $variables['gt_ct_cs_bg_image_url'] = image_style_url('slide_overlay_image', $field_gtct_cs_bg_image[0]['uri']);
+    }
+    else {
+      $variables['gt_ct_cs_bg_image_url'] = FALSE;
+    }
+
+    // overlay image
+    if (!empty($node->field_gtct_cs_overlay_image)) {
+      $field_gtct_cs_overlay_image = field_get_items('node', $node, 'field_gtct_cs_overlay_image');
+      $variables['gt_ct_cs_overlay_image_url'] = image_style_url('slide_overlay_image', $field_gtct_cs_overlay_image[0]['uri']);
+    }
+    else {
+      $variables['gt_ct_cs_overlay_image_url'] = FALSE;
+    }
+
+    // background color
+    $field_gtct_cs_bg_color = field_get_items('node', $node, 'field_gtct_cs_bg_color');
+    $variables['gt_ct_cs_bg_color'] = $field_gtct_cs_bg_color[0]['value'];
+
+    $field_gtct_cs_link_location = field_get_items('node', $node, 'field_gtct_cs_link_location');
+    $variables['gt_ct_cs_jump_link_url'] = $field_gtct_cs_link_location[0]['url'];
+    $variables['gt_ct_cs_jump_link_title'] = $field_gtct_cs_link_location[0]['title'];
+  }
+
+  if ($node->type == 'gt_ct_carousel') {
+
+    $field_gtct_crsl_slides = field_get_items('node', $node, 'field_gtct_crsl_slides');
+    $slide_count = count($field_gtct_crsl_slides);
+    $slide_array = array();
+    for ($i = 0; $i < $slide_count; $i++) {
+      $slide_array[] = node_view(node_load($field_gtct_crsl_slides[$i]['target_id']));
+    }
+    $variables['gt_ct_cs_slide_array'] = $slide_array;
+  }
+}

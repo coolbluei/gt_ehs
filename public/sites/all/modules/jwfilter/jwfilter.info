@@ -1,0 +1,10 @@
+name = GT JW Player Embed Filter
+description = Filter to parse [jw] tags into JW Player Embeds of Georgia Tech Media Repository videos
+core = 7.x
+package = Input filters
+; Information added by drupal.org packaging script 
+version = "7.x-0.07a"
+core = "7.x"
+project = "jwfilter"
+datestamp = ""
+

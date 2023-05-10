@@ -1,0 +1,145 @@
+/**
+* @file 
+* GT Super Block content type styling
+*/
+
+@import "compass";
+@import "global/colors";
+@import "global/fonts";
+
+// Overriding block styles
+.nodeblock-gt-ct-super-block .block-body {
+  background: transparent !important;
+  background-color: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+// Title 
+.super-block__title {
+  //font-family: $foundation_condensed;
+  font-size: 2em; 
+  font-weight: 400;
+  line-height: 1.05;
+  margin: 0 0 10px;
+  a {
+    color: $gt_body_black;
+    display: block;
+    text-decoration: none;
+    &:link, &:visited, &:hover, &:active {
+      color: $gt_body_black;
+      text-decoration: none;
+    }
+  }
+  .sb-skin-blue &,
+  .sb-skin-blue & a,
+  .sb-skin-gold & a {
+    color: $gt_bread_blue;
+    &:hover {
+      color: $gt_bread_blue;
+    }
+  }
+}
+
+// Image
+.super-block__image {
+  float: left;
+  width: 100%;
+  .block.full-width .sb-image-left.sb-teaser-true &,
+  .block.three-quarter-width .sb-image-left.sb-teaser-true & {
+    padding-right: 20px;
+    width: 30%;
+  }
+  .block.full-width .sb-image-right.sb-teaser-true &,
+  .block.three-quarter-width .sb-image-right.sb-teaser-true & {
+    float: right;
+    padding-left: 20px;
+    width: 30%;
+  }
+  .super-block__image-wrapper {
+    margin-bottom: 10px; 
+    position: relative;
+  }
+}
+
+// Lower elements wrapper (teaser, big jump link)
+.super-block__lower {
+  float: left;
+  width: 100%;
+  .block.full-width .sb-image-left.sb-teaser-true &,
+  .block.full-width .sb-image-right.sb-teaser-true &,
+  .block.three-quarter-width .sb-image-left.sb-teaser-true &,
+  .block.three-quarter-width .sb-image-right.sb-teaser-true & { width: 70%; }
+}
+
+// Jump link
+.super-block__jump-link {
+  margin-bottom: 10px;
+  position: relative;
+  a {
+    background-color: $gt_footer_gray;
+    color: $gt_action_gray;
+    display: block;
+    float: left;
+    font-weight: 700;
+    padding: 10px 14px 10px 34px;
+    text-decoration: none;
+    &:link, &:visited, &:hover, &:active {
+      color: #fff;
+      text-decoration: none;
+    }
+    &:before {
+      font-family: "FontAwesome";
+      font-size: 1.4em;
+      color: $gt_gold;
+      content: "\f0a9";
+      display: inline-block;
+      left: 10px;
+      position: absolute;
+      top: 6px;
+    }
+  }
+  .sb-skin-blue & a {
+    background-color: $gt_bread_blue;
+    color: #fff;
+    &:hover { color: #fff;  }
+  }
+  .sb-skin-gold & a {
+    background-color: $gt_gold;
+    color: #fff;
+    &:before { color: $gt_bread_blue; }
+  }
+  .super-block__image & {
+    bottom: -1px;
+    font-size: .86em;
+    margin: 0;
+    position: absolute;
+    right: 0;
+    a { 
+      background-color: #fff;
+      @include border-radius(5px 0 0 0);
+      color: $gt_footer_gray;
+      display: block;
+      @include opacity(.9);
+      padding: 8px 10px 8px 28px;
+      &:hover { color: $gt_body_black; }
+      &:before {
+        font-size: 1.3em;
+        left: 8px;
+        top: 6px;
+      }
+    }
+  }
+  .sb-skin-blue .super-block__image & a {
+    background-color: $gt_bread_blue;
+    color: $gt_navy_light;
+    @include opacity(1);
+    &:hover { color: #fff; }
+  }
+  .sb-skin-gold .super-block__image & a {
+    background-color: $gt_gold;
+    color: #fff;
+    @include opacity(1);
+    &:hover { color: #fff; }
+  }
+}

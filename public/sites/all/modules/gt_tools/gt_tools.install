@@ -1,0 +1,201 @@
+<?php
+
+/**
+ * GT Tools
+ *
+ * @file    gt_tools.install
+ * @author  Fletcher Moore <fletch@gatech.edu>
+ *
+ */
+
+/**
+ * Implements hook_install() in order to establish our custom menus.
+ *
+ */
+function gt_tools_install() {
+  // Action items
+  $menu = array(
+    'menu_name' => 'gt-action-items',
+    'title' => t('GT action items'),
+    'description' => t('Up to 3 links adjacent to the top menu; <em>E.g.</em> "Apply," "Contact," or "Give."'),
+  );
+  menu_save($menu);
+
+  // Footer links
+  for ($i = 1; $i < 4; $i++) {
+    $menu = array(
+      'menu_name' => 'gt-footer-links-' . $i,
+      'title' => t("GT footer links @count", array('@count' => $i)),
+      'description' => t("@count of 3 footer menus. Allows for a maximum of 25 items.", array('@count' => $i)),
+    );
+    menu_save($menu);
+  }
+
+  // Social media links
+  $menu = array(
+    'menu_name' => 'gt-social-media',
+    'title' => t('GT social media links'),
+    'description' => t("Links to your site's social media properties."),
+  );
+  menu_save($menu);
+
+  // Footer utility links
+  $menu = array(
+    'menu_name' => 'gt-footer-utility-links',
+    'title' => t('GT footer utility links'),
+    'description' => t('Footer utility links; <em>E.g.</em> "Contact" or "Feedback."'),
+  );
+  menu_save($menu);
+}
+
+function gt_tools_uninstall() {
+  // Delete action items
+  $menu = array('menu_name' => 'gt-action-items');
+  menu_delete($menu);
+
+  // Delete footer links
+  for ($i = 1; $i < 4; $i++) {
+    $menu = array('menu_name' => 'gt-footer-links-' . $i);
+    menu_delete($menu);
+  }
+
+  // Delete social media links
+  $menu = array('menu_name' => 'gt-social-media');
+  menu_delete($menu);
+
+  // Delete footer utility links
+  $menu = array('menu_name' => 'footer-utility-links');
+  menu_delete($menu);
+}
+
+function gt_tools_schema() {
+  $schema['menu_icons'] = array(
+    'description' => 'The base table for menu icon data',
+    'fields' => array(
+      'mlid' => array(
+        'description' => 'The primary identifier for a menu icon',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'filename' => array(
+        'description' => 'The name of the file icon',
+        'type' => 'varchar',
+        'length' => 255,
+        'default' => NULL,
+      ),
+      'preset' => array(
+        'description' => 'The selected preset for this menu',
+        'type' => 'varchar',
+        'length' => 255,
+        'default' => NULL,
+      ),
+    ),
+    'unique keys' => array(
+      'mlid' => array('mlid'),
+    ),
+    'foreign keys' => array(
+      'menu_links' => array(
+        'table' => 'menu_links',
+        'columns' => array('mlid' => 'mlid'),
+      ),
+    ),
+    'primary key' => array('mlid'),
+  );
+
+  $schema['block_classes'] = array(
+    'description' => 'The base table for storing available block classes',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'The primary identifier for a class',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => 'The css-friendly name of the class',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'description' => array(
+        'description' => 'The administrative name of the class',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('cid'),
+  );
+
+  $schema['block_classes_data'] = array(
+    'description' => 'The base table for storing classes on block ids',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'The primary identifier for classes',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'module' => array(
+        'description' => 'The module providing the block',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'delta' => array(
+        'description' => 'The block ID',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      )
+    ),
+    'primary key' => array('cid', array('module', 128), array('delta', 128)),
+  );
+
+  $schema['block_layout'] = array(
+    'description' => 'The base table for storing block layout classes',
+    'fields' => array(
+      'class' => array(
+        'description' => 'The layout class name',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'clearfix' => array(
+        'description' => 'A flag indicating clearfix status for the block',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'module' => array(
+        'description' => 'The module providing the block',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'delta' => array(
+        'description' => 'The block ID',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      )
+    ),
+    'primary key' => array(array('module', 128), array('delta', 128)),
+  );
+
+  return $schema;
+}
+
+/**
+ * Give admin role permissions for the GT Tools module.
+ */
+function gt_tools_update_7001() {
+  $permissions = array();
+  $module_permissions = module_invoke('gt_tools', 'permission');
+  foreach (array_keys($module_permissions) as $permission) {
+    $permissions[$permission] = TRUE;
+  }
+  $admin_role = variable_get('user_admin_role');
+  user_role_change_permissions($admin_role, $permissions);
+}

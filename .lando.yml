@@ -1,0 +1,20 @@
+name: gtehs
+recipe: drupal7
+config:
+  php: '7.4'
+  composer_version: '2.0.7'
+  via: nginx
+  webroot: public
+  database: mysql:5.7
+  drush: ^8
+  xdebug: true
+services:
+  appserver:
+    overrides:
+      environment:
+        DRUSH_OPTIONS_URI: "https://gtehs.lndo.site"
+  pma:
+    type: phpmyadmin
+tooling:
+  drush:
+    cmd: "/app/vendor/bin/drush --root=/app/public"

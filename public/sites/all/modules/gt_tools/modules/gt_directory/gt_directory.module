@@ -1,0 +1,314 @@
+<?php
+/**
+* GT Directory
+*
+* This module provides an interface to the GT Directory.
+*
+* @author Office of Communications and Marketing <webteam@comm.gatech.edu>
+* @version 1.0
+* @package GT
+*
+*/
+
+define('GT_LDAP_HOST', 'ldap.gatech.edu');
+define('GT_LDAP_PORT', '389');
+define('GT_LDAP_BASE', 'dc=gatech,dc=edu');
+
+/**
+* Implementation of hook_menu()
+* This is the controlling function that detects queries and displays
+* the results and/or the form interface
+*/
+function gt_directory_menu() {
+  $items['directory'] = array(
+    'title' => 'Directory Search',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('gt_directory_directory_form'),
+    'access arguments' => array('access content'),
+  );
+  $items['directory/results'] = array(
+    'title' => 'Directory Search',
+    'page callback' => 'gt_directory_directory_view',
+    'page arguments' => array(1, '', 2, 3),
+    'access arguments' => array('access content'),
+  );
+  $items['directory/detail'] = array(
+    'title' => 'Directory Search',
+    'page callback' => 'gt_directory_directory_view',
+    'page arguments' => array(1, 2, 3, 4),
+    'access arguments' => array('access content'),
+  );
+
+  return $items;
+}
+
+/**
+ * @param string $op
+ * @param string $firstname
+ * @param string $lastname
+ * @return string
+ */
+function gt_directory_directory_view($op = '', $name = '', $firstname = '', $lastname = '') {
+  if (!$_SERVER['HTTP_REFERER']) { return drupal_get_form('gt_directory_directory_form'); }
+
+  $output = '';
+  switch ($op) {
+    case 'detail':
+      $output .= gt_directory_detail($name, $firstname, $lastname);
+      break;
+    case 'results':
+      $output .= gt_directory_lookup($lastname, $firstname);
+      break;
+  }
+  $form = drupal_get_form('gt_directory_directory_form');
+  $output .= render($form);
+
+  return $output;
+}
+
+/**
+* gt_directory_directory_form
+* Directory form builder
+*/
+function gt_directory_directory_form() {
+  $form['help'] = array(
+    '#markup' => '<p>This page allows you to locate information on faculty, staff, and students at Georgia Tech.</p>',
+  );
+  $form['search'] = array(
+    '#type' => 'fieldset',
+  );
+  $form['search']['help'] = array(
+    '#markup' => '<p>Enter the first name or last name of the person you want to find:</p>',
+  );
+  $form['search']['firstname'] = array(
+    '#type' => 'textfield',
+    '#title' => t('First name'),
+  );
+  $form['search']['lastname'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Last name'),
+  );
+
+  if (!gt_directory_user_is_local()) {
+    $form['search']['captcha'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Are you a robot?'),
+      '#description' => t('This question is for testing whether or not you are a human visitor and to prevent automated spam submissions.'),
+    );
+
+    $a = rand(0, 9);
+    $b = rand(0, 9);
+
+    $form['search']['captcha']['captcha-test'] = array(
+      '#type' => 'textfield',
+      '#title' => $a . ' + ' . $b . ' =',
+      '#description' => t('Solve this simple math problem and enter the result. E.g. for 1+3, enter 4.'),
+    );
+
+    $form['search']['captcha']['captcha-answer'] = array(
+      '#type' => 'hidden',
+      '#value' => $a + $b,
+    );
+
+    $form['search']['captcha']['captcha-enabled'] = array(
+      '#type' => 'hidden',
+      '#value' => TRUE,
+    );
+  }
+
+  $form['search']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search'),
+  );
+
+  $form['hints'] = array(
+    '#markup' => '
+      <h3>Hints for Searching:</h4>
+		  <ul>
+		    <li>Searches are not case sensitive</li>
+  		  <li>If you can\'t find someone you are looking for or are unsure of the spelling, try searching only for the first part of the name.</li>
+	  	  <li>The search will only list employees who have valid entries in the Georgia Tech Human Resources database and students who are currently enrolled at Georgia Tech. If you can\'t find a specific member of our faculty or staff, try contacting the department for which they work.</li>
+		    <li>This search page retrieves only campus directory information (e.g. names, e-mail addresses, etc.). If you are looking for other information, or can\'t find a particular person, you may want to try searching the Georgia Tech Web at: <a href="http://www.gatech.edu/search">http://www.gatech.edu/search</a>.</li>
+		  </ul>
+		  <p>Complete <a href="http://www.gatech.edu/offices-and-departments">Office and Department Listings</a> are also available.</p>
+		  <p>For additional information, contact Georgia Tech Information (404.894.2000) or the <a href="http://www.ohr.gatech.edu/">Georgia Tech Office of Human Resources</a> (404.894.4847).</p>
+		',
+	);
+
+  return $form;
+}
+
+/**
+ * @param $form_id
+ * @param $form_values
+ */
+function gt_directory_directory_form_validate($form_id, $form_values) {
+  if ($form_values['input']['firstname'] == '' && $form_values['input']['lastname'] == '') {
+    form_set_error('search', 'You must enter either a first or a last name.');
+  }
+
+  if (isset($form_values['input']['captcha-enabled'])) {
+    if ($form_values['input']['captcha-test'] != $form_values['input']['captcha-answer']) {
+      form_set_error('search', 'You entered an incorrect value for the math problem.');
+    }
+  }
+}
+
+/**
+ * @param $form_id
+ * @param $form_values
+ */
+function gt_directory_directory_form_submit($form_id, $form_values) {
+  drupal_goto('directory/results/' . check_plain($form_values['values']['firstname']) . '/' . check_plain($form_values['values']['lastname']));
+}
+
+/**
+ * @param $name
+ * @return string
+ */
+function gt_directory_lookup($lastname, $firstname) {
+	// Figure out if the request if from 'our network'
+	$local = gt_directory_user_is_local();
+	$key = "c9H85g8sfL6rdcsbOK46LXokmkeV07wupLC8Zqe2rPOCA5HShPsD8HetTqfA";
+  $name = $lastname . ',' . $firstname;
+
+	// Connect to ldap and query
+	$ldap = gt_directory_ldap_connect();
+	if ($ldap) {
+    $filter = '(cn=*' . $name . '*)';
+		$result = @ldap_search($ldap, '', $filter);
+		ldap_sort($ldap, $result, "cn");
+	}
+
+	// Display the results
+	if (ldap_count_entries($ldap, $result) > 0) {
+    $output = '<h2>Search Results</h2>';
+
+    //Loop through entries one by one to get the DN and associated data.
+		$entry = ldap_first_entry($ldap, $result);
+		while ($entry) {
+			$dn = urlencode(base64_encode(mcrypt_encrypt(MCRYPT_RIJNDAEL_256, md5($key), ldap_get_dn($ldap, $entry), MCRYPT_MODE_CBC, md5(md5($key)))));
+			$result_array = ldap_get_attributes($ldap, $entry);
+      if ($result_array['title'][0] != "Applicant") {
+        $output .= '<p>' . l(str_replace( ',', ', ', $result_array["cn"][0]), 'directory/detail/' . $dn . '/' . $firstname . '/' . $lastname);
+        if ($local) { $output .= " (" . $result_array['title'][0] . ")"; }
+        $output .= "</p>";
+      }
+			$entry = ldap_next_entry($ldap, $entry);
+		}
+	}
+
+  if (!isset($output)) { $output = '<h3>Sorry! No results were found.</h3>'; }
+
+  drupal_set_breadcrumb(array(
+    l(t('Home'), NULL),
+    l(t('Directory'), 'directory'),
+    l(t("Search: !name", array('!name' => $firstname . ' ' . $lastname )), 'directory/results/' . $firstname . '/' . $lastname),
+  ));
+
+  return $output;
+}
+
+/**
+ * Detail view
+ */
+function gt_directory_detail($name, $firstname = '', $lastname = '') {
+  $output = '';
+  $local = gt_directory_user_is_local();
+  $key = "c9H85g8sfL6rdcsbOK46LXokmkeV07wupLC8Zqe2rPOCA5HShPsD8HetTqfA";
+	$name = mcrypt_decrypt(MCRYPT_RIJNDAEL_256, md5($key), base64_decode(urldecode($name)), MCRYPT_MODE_CBC, md5(md5($key)));
+
+  // Connect to ldap and query
+  $ldap = gt_directory_ldap_connect();
+  if ($ldap) {
+    // get info based on gt username
+		$result = @ldap_search($ldap, $name, '');
+		$result_array = ldap_get_entries($ldap, $result);
+
+    if ($result_array) {
+      // If more than one directory entry exists for GT ID username, it's either a student,
+      // or the directory returned multiple results based on the GT ID username search (it does this for usernames like "ron")
+      // So, loop through and only get results that match the $name variable. Then if there is still more than one result,
+      // it is most likely a student, so go with the listing that identifies them as such.
+      $directory_result = '';
+      if (count($result_array) > 1) {
+        $filtered_results = array();
+        for ($i = 0; $i < $result_array['count']; $i++) {
+          if ($result_array[$i]['primaryuid'][0] == base64_decode($name)) { $filtered_results[] = $result_array[$i]; }
+        }
+        if (count($filtered_results) > 1) {
+          for ($i = 0; $i < count($filtered_results); $i++) {
+            if ($result_array[$i]['employeetype'][0] == 'student') { $directory_result = $filtered_results[$i]; }
+          }
+        } else {
+          if (isset($filtered_results[0])) { $directory_result = $filtered_results[0]; }
+        }
+        // if for some reason we still don't have a result, default to the first one
+        if ($directory_result == '') { $directory_result = $result_array[0]; }
+      } else {
+        $directory_result = $result_array[0];
+      }
+
+      // assemble listing
+      if ($directory_result['employeetype'][0] == 'student') {
+        $output .= '<h2>' . str_replace( ',', ', ', $directory_result['cn'][0]) . '</h2>';
+        $output .= '<p><strong>E-MAIL:</strong> <a href="mailto:' . $directory_result["mail"][0] . '">' . $directory_result["mail"][0] . '</a></p>';
+        $output .= '<p><strong>DEPARTMENT: </strong> ' . $directory_result["ou"][0] . '</p>';
+        if ($local) { $output .= '<p><strong>TITLE:</strong> ' . $directory_result["title"][0] . '</p>'; }
+        // else output employee listing
+      } else {
+        if (isset($directory_result["cn"][0])) { $output .= '<h2>' . str_replace( ',', ', ', $directory_result['cn'][0]) . '</h2>'; }
+        if (isset($directory_result["mail"][0])) { $output .= '<p><strong>E-MAIL:</strong> <a href="mailto:' . $directory_result["mail"][0] . '">' . $directory_result["mail"][0] . '</a></p>'; }
+        if (isset($directory_result["ou"][0])) { $output .= '<p><strong>DEPARTMENT:</strong> ' . $directory_result["ou"][0] . '</p>'; }
+        if (isset($directory_result["title"][0])) { $output .= '<p><strong>TITLE:</strong> ' . $directory_result["title"][0] . '</p>'; }
+        if (isset($directory_result["postaladdress"][0])) { $output .= '<p><strong>DEPT. MAIL CODE:</strong> ' . $directory_result["postaladdress"][0] . '</p>'; }
+        if (isset($directory_result["telephonenumber"][0])) { $output .= '<p><strong>PHONE:</strong> ' . $directory_result["telephonenumber"][0] . '</p>'; }
+      }
+    } else {
+      $output .= '<h3>Sorry! No results were found.</h3>';
+    }
+  }
+
+  drupal_set_breadcrumb(array(
+    l(t('Home'), NULL),
+    l(t('Directory'), 'directory'),
+    l(t("Search: !name", array('!name' => $firstname . ' ' . $lastname )), 'directory/results/' . $firstname . '/' . $lastname),
+    l(t("Detail: !name", array('!name' => str_replace( ',', ', ', $directory_result['cn'][0]))), '#'),
+  ));
+
+
+  return $output;
+}
+
+/**
+ * Determine if the request is from the local network
+ * @return boolean $local True if the request is local
+ */
+function gt_directory_user_is_local() {
+  $ip = explode('.', $_SERVER['HTTP_X_FORWARDED_FOR']);
+  if (($ip[0] == 130) && ($ip[1] == 207) ||
+     ($ip[0] == 128) && ($ip[1] == 61) ||
+     ($ip[0] == 143) && ($ip[1] == 215) ||
+     ($ip[0] == 192) && ($ip[1] == 93) && ($ip[2] == 8)) {
+    watchdog('directory_local', 'Forwarded IP: ' . $_SERVER['HTTP_X_FORWARDED_FOR']);
+    return TRUE;
+  }
+  // for local dev
+  //if ($_SERVER["REMOTE_ADDR"] == "127.0.0.1") { return TRUE; }
+  watchdog('directory_remote', 'Forwarded IP: ' . $_SERVER['HTTP_X_FORWARDED_FOR']);
+  return FALSE;
+}
+
+/**
+ * gt_util_ldap_connect
+ * Establish a connection to LDAP server
+ */
+function gt_directory_ldap_connect() {
+  $ldap = ldap_connect(GT_LDAP_HOST, GT_LDAP_PORT);
+  if ($ldap) { return $ldap; }
+  else {
+    drupal_set_message('Sorry, the directory server is unresponsive. Please try again later.', 'error');
+    return FALSE;
+  }
+}
+

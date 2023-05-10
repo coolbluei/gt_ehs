@@ -1,0 +1,19 @@
+// Media query breakpoints
+
+$hh_portrait_max: 20em; // 320px
+$hh_landscape_max: 30em; // 480px
+$smtab_portrait_max: 37.5em; // 600px
+$tab_portrait_max: 48em; // 768px
+$smtab_landscape_max: 50em; // 800px
+$tab_landscape_max: 64em; // 1024px
+$desktop_max: 105em; // 1680px
+
+// Misc. positioning, widths, and z-index variables
+$row_width: 1170px;
+$row_width_medium: 1425px;
+$row_width_wide: 1680px;
+$z_top: 1000;
+$z_mid: 500;
+$z_low: 10;
+$z_neg: -100;
+$off_canvas: -1000em;

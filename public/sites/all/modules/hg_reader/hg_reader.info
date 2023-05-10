@@ -1,0 +1,12 @@
+; $Id: $
+name = Mercury Reader
+description = "XML reader for Mercury."
+package = "GT"
+core = 7.x
+php = 5.1
+version = "7.x-2.20"
+configure = admin/config/hg/hg_reader
+project = "hg_reader"
+datestamp = "1591891026"
+project status url = http://drupal.gatech.edu/release_history/hg_reader/7.x
+files[] = tests/hg_reader.test

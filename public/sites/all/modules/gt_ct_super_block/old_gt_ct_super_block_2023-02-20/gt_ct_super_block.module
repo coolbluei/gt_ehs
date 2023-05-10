@@ -1,0 +1,137 @@
+<?php
+
+/**
+ * @file
+ * Code for the GT Super Block feature.
+ */
+include_once 'gt_ct_super_block.features.inc';
+
+/**
+ * Registering template files.
+ *
+ * @param $theme_registry
+ *   An array keyed by theme hook name containing information returned from hook_theme()
+ */
+function gt_ct_super_block_theme_registry_alter(&$theme_registry) {
+  /** $theme_registry['template-file']['path'] = drupal_get_path('module', 'gt_ct_super_block') . "/templates/"; **/
+  
+  // Defined path to the current module.
+  $module_path = drupal_get_path('module', 'gt_ct_super_block');
+  // Find all .tpl.php files in this module's folder recursively.
+  $template_file_objects = drupal_find_theme_templates($theme_registry, '.tpl.php', $module_path);
+  // Iterate through all found template file objects.
+  foreach ($template_file_objects as $key => $template_file_object) {
+    // If the template has not already been overridden by a theme.
+    if (!isset($theme_registry[$key]['theme path']) || !preg_match('#/themes/#', $theme_registry[$key]['theme path'])) {
+      // Alter the theme path and template elements.
+      $theme_registry[$key]['theme path'] = $module_path;
+      $theme_registry[$key] = array_merge($theme_registry[$key], $template_file_object);
+      $theme_registry[$key]['type'] = 'module';
+    }
+  }
+}
+
+/**
+ * Override or insert variables into the block templates.
+ *
+ * @param $variables
+ *   An array of variables to pass to the theme template.
+ * @param $hook
+ *   The name of the template being rendered ("block" in this case.)
+ */
+function gt_ct_super_block_preprocess_block(&$variables, $hook) {
+
+  // Adding template suggestions for nodeblock blocks
+  if ($variables['block']->module == 'nodeblock') {
+
+    $variables['theme_hook_suggestions'][] = 'block__' . $variables['block']->module . '__' . $variables['block']->{'#node'}->type;
+
+    $variables['theme_hook_suggestions'][] = 'block__' . $variables['block']->module . '__' . $variables['block']->{'#node'}->type . '__' . $variables['block']->{'#node'}->nid;
+  }
+}
+
+/**
+ * Override or insert variables into the block templates.
+ *
+ * @param $variables
+ *   An array of variables to pass to the theme template.
+ */
+function gt_ct_super_block_preprocess_node(&$variables) {
+
+  $node = $variables['elements']['#node'];
+
+  // title field
+  $field_nbsb_title = field_get_items('node', $node, 'field_nbsb_title');
+  if ($field_nbsb_title) {
+    $variables['sb_title'] = strip_tags($field_nbsb_title[0]['value'], '<br><em><strong>');
+  }
+  else {
+    $variables['sb_title'] = FALSE;
+  }
+
+  // teaser text
+  $field_nbsb_teaser_text = field_get_items('node', $node, 'field_nbsb_teaser_text');
+  if ($field_nbsb_teaser_text) {
+    $variables['sb_teaser'] = $field_nbsb_teaser_text[0]['safe_value'];
+    // set content placement classes
+    $variables['sb_content_placement'] = 'sb-teaser-true';
+  }
+  else {
+    $variables['sb_teaser'] = FALSE;
+    // set content placement classes
+    $variables['sb_content_placement'] = 'sb-teaser-false';
+  }
+
+  // image
+  $field_nbsb_primary_image = field_get_items('node', $node, 'field_nbsb_primary_image');
+  if ($field_nbsb_primary_image) {
+    $r_elements = field_view_value('node', $node, 'field_nbsb_primary_image', $field_nbsb_primary_image[0]);
+    $primary_image = render($r_elements);
+    $variables['sb_image'] = $primary_image;
+    // appending to content placement classes
+    $field_nbsb_image_placement = field_get_items('node', $node, 'field_nbsb_image_placement');
+    $variables['sb_content_placement'] .= ' ' . $field_nbsb_image_placement[0]['value'];
+  }
+  else {
+    $variables['sb_image'] = FALSE;
+    // appending to content placement classes
+    $variables['sb_content_placement'] .= ' sb-image-none';
+  }
+
+  // jump link URL + title + type (node/file)
+  $field_nbsb_jump_link = field_get_items('node', $node, 'field_nbsb_jump_link');
+  if ($field_nbsb_jump_link) {
+    $variables['sb_jump_link'] = TRUE;
+    $variables['sb_jump_link_url'] = $field_nbsb_jump_link[0]['url'];
+    $variables['sb_jump_link_title'] = $field_nbsb_jump_link[0]['title'];
+    /* Determines if link is to a File, so can control output when using imce,
+     * assumes imce is not set to always use absolute urls and that the
+     * linkit profile for this field is using raw urls (with no additional slash at the start)
+     */
+    $is_file = strpos($field_nbsb_jump_link[0]['url'], ("/" . variable_get('file_public_path')), 0);
+    if ($is_file === 0) {
+      $variables['sb_jump_link_type'] = 'file';
+    }
+    else {
+      $variables['sb_jump_link_type'] = 'node';
+    }
+  }
+  else {
+    $variables['sb_jump_link'] = FALSE;
+    $variables['sb_jump_link_url'] = FALSE;
+    $variables['sb_jump_link_title'] = FALSE;
+    $variables['sb_jump_link_type'] = FALSE;
+  }
+
+  // jump link placement values array
+  $field_nbsb_jump_link_location = field_get_items('node', $node, 'field_nbsb_jump_link_location');
+  $jump_link_location_array = array();
+  for ($i = 0; $i < count($field_nbsb_jump_link_location); $i++) {
+    $jump_link_location_array[] = $field_nbsb_jump_link_location[$i]['value'];
+  }
+  $variables['sb_jump_link_location_array'] = $jump_link_location_array;
+
+  // super block skin
+  $field_nbsb_skin = field_get_items('node', $node, 'field_nbsb_skin');
+  $variables['sb_skin'] = $field_nbsb_skin[0]['value'];
+}

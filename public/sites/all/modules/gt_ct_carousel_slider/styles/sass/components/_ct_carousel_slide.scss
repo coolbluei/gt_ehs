@@ -1,0 +1,268 @@
+// Carousel Slide styling
+
+/* Flexslider controler overrides */
+.gtct-carousel__slides-wrapper {
+  position: relative;
+  .flexslider-processed .slide { margin: 0; }
+  .flex-control-nav { 
+    bottom: 10px;
+    font-size: 1em;
+    line-height: 1;
+    li { margin: 0 6px; }
+    @media only screen and (max-width: 51em) { bottom: -10px; }
+  }
+  @media only screen and (max-width: 51em) { margin-bottom: 20px; }
+}
+.gtct-carousel__slides-wrapper .flex-control-paging li a {
+  background: rgba(255, 255, 255, .65);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+  &:hover { background: rgba(255, 255, 255, 1); }
+  &.flex-active { background: rgba(255, 255, 255, 1); }
+}
+.gtct-carousel__slides-wrapper .flex-direction-nav {
+  li { margin: 0; }
+  a {
+    height: 50px;
+    @include opacity(.85);
+    padding: 5px;
+    text-shadow: 0 2px 3px #5a5a5a;
+    top: 92%;
+    &:link, &:visited { color: #fff; }
+    &:hover, &:active { color: #fff; }
+    &:before {
+      content: "\f137";
+      font-family: "FontAwesome";
+      font-size: 28px;
+      line-height: 1.5;
+    }
+    &.flex-prev { left: 10px; }
+    &.flex-next {
+      &:before { content: "\f138"; }
+      right: 10px;
+    }
+  }
+  /* Handheld screen sizes */
+  @media only screen and (max-width: 51em) {
+    display: none;
+  }
+}
+
+/* Override for header-spotlight region to help accommodate full bleed carousels */
+#header-spotlight {
+  @media only screen and (max-width: 51em) { padding-top: 0 !important; }
+  .region-spotlight {
+    padding: 0;
+    .block { padding: 0; }
+  }
+}
+
+.node-type-gt-ct-carousel-slide {
+  #main > .row,
+  #block-system-main {
+    max-width: 100%;
+    padding: 0;
+  }
+  &.page-node-edit #main > .row,
+  &.page-node-edit #block-system-main,
+  &.page-node-clone #main > .row,
+  &.page-node-clone #block-system-main,{
+    max-width: 1024px;
+    padding: 0 10px;
+  }
+  #page-title,
+  #support {
+    margin: 0 auto; 
+    max-width: 1024px;
+    padding: 0 10px;
+  }
+}
+
+.gtct-carousel-slide__bg-image {
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  &.bg-color-gt-navy { background-color: $gt_navy; }
+  &.bg-color-gt-gold { background-color: $gt_gold; }
+  &.bg-color-gt-action-gray { background-color: $gt_action_gray; }
+  &.bg-color-gt-search-gray { background-color: $gt_search_gray; }
+  &.bg-color-white { background-color: #fff; }
+}
+
+.gtct-carousel-slide__overlay-image {
+  background-position: left bottom;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 230px; 
+  margin: 0 auto;
+  // >= 480px
+  @media only screen and (min-width: $hh_landscape_max) {
+    height: 375px;
+  }
+  // >= ~800px
+  @media only screen and (min-width: 51em) {
+    height: 440px;
+    &.title-left,
+    &.title-right { max-width: 1024px; }
+    #header-spotlight & { height: 600px; }
+  }
+}
+
+.gtct-carousel-slide__title-wrapper {
+  height: 230px;
+  position: relative;
+  // >= 480px
+  @media only screen and (min-width: $hh_landscape_max) {
+    height: 375px;
+  }
+  // >= 800px
+  @media only screen and (min-width: 51em) {
+    height: 440px;
+    .title-left &  {
+      float: left;
+      width: 50%;
+    }
+    .title-right & { 
+      float: right;
+      width: 50%;
+    }
+    #header-spotlight & { height: 600px; }
+  }
+}
+
+.gtct-carousel-slide__title-graphic {
+  text-align: center;
+  .hidden { visibility: hidden; }
+  .title-left &  {
+    float: left;
+    width: 50%;
+    // >= 800px
+    @media only screen and (min-width: $smtab_landscape_max) { width: 100%; }
+  }
+  .title-right & { 
+    float: right;
+    width: 50%;
+    // >= 800px
+    @media only screen and (min-width: $smtab_landscape_max) { width: 100%; }
+  }
+  img { 
+    max-height: 230px;
+    // >= 480px
+    @media only screen and (min-width: $hh_landscape_max) { max-height: 375px; }
+    // >= 800px
+    @media only screen and (min-width: 51em) { max-height: 440px; }
+  }
+  // >= 800px
+  @media only screen and (min-width: 51em) {
+    #header-spotlight & { padding-top: 160px; }
+  }
+}
+
+.gtct-carousel-slide__title-static {
+  background-color: #fff;
+  bottom: 0;
+  left: 0;
+  padding: 20px 0;
+  position: absolute;
+  width: 100%;
+  @include opacity(.95);
+  // >= ~800px
+  @media only screen and (min-width: 51em) {
+    &:before {
+      content: $caret-right;
+      color: #fff;
+      display: block;
+      font-family: $font_awesome;
+      font-size: 5em;
+      right: -20px;
+      position: absolute;
+      top: 30%;
+      z-index: -1;
+      @include opacity(.95);
+    }
+    .title-left &  {
+      bottom: 55px;
+      left: 40px;
+      padding: 25px;
+    }
+    .title-right & { 
+      bottom: 55px;
+      right: 40px;
+      padding: 25px;
+    }
+    .title-right &:before {
+      content: "\f0d9";
+      left: -20px;
+      right: 0;
+    }
+  }
+  // Main title
+  .gtct-carousel-slide__title-text {
+    font-size: 1.5em;
+    font-family: $palladio_regular;
+    line-height: 1;
+    margin-bottom: 5px;
+    padding: 0 20px;
+    a { display: block; }
+    a:link, a:visited {
+      text-decoration: none;
+    }
+    // >= 480px
+    @media only screen and (min-width: $hh_landscape_max) {
+      font-size: 2.2em;
+      margin-bottom: 12px;
+    }
+    // >= ~800px
+    @media only screen and (min-width: 51em) {
+      font-size: 2.75em;
+      margin: 0 auto 24px;
+      max-width: 1024px;
+    }
+  }
+  // Teaser text
+  .gtct-carousel-slide__summary-text {
+    display: none;
+    font-family: $palladio_regular;
+    padding: 0 20px;
+    // >= 480px
+    @media only screen and (min-width: $hh_landscape_max) {
+      display: block;
+      font-size: 1.3em;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    // >= 800px
+    @media only screen and (min-width: $smtab_landscape_max) {
+      line-height: 1.4;
+      margin: 0 auto 24px;
+      max-width: 1024px;
+    }
+  }
+  .gtct-carousel-slide__jumplink {
+    display: block;
+    font-family: $foundation_condensed;
+    font-size: .9em;
+    line-height: 1.15;
+    padding: 0 20px;
+    text-align: right;
+    text-transform: uppercase;
+    &:link, &:visited {
+      text-decoration: none;
+    }
+    &:after {
+      content: "\f054";
+      display: inline-block;
+      font-family: $font_awesome;
+      font-size: .8em;
+      padding-left: 3px;
+    }
+    // >= 480px
+    @media only screen and (min-width: $hh_landscape_max) { font-size: 1.1em; }
+    // >= 800px
+    @media only screen and (min-width: 51em) {
+      font-size: 1.3em;
+      margin: 0 auto;
+      max-width: 1024px;
+    }
+  }
+}
+

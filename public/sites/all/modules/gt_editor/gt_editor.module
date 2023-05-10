@@ -1,0 +1,7 @@
+<?php
+/**
+ * @file
+ * Code for the GT Editor settings feature.
+ */
+
+include_once 'gt_editor.features.inc';

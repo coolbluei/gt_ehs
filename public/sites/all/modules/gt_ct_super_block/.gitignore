@@ -1,0 +1,11 @@
+# MacOS crap
+.DS_Store
+
+# Phpstorm stuff
+.idea
+
+# Sass caches
+.sass-cache
+
+# Netbeans files
+/nbproject/*

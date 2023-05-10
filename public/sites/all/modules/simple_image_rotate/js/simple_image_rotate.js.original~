@@ -1,0 +1,28 @@
+(function ($) {
+    Drupal.behaviors.simple_image_rotate = {
+        attach: function (context, settings) {
+            $('.rotate-cw').once().click(function () {
+                var weight = $(this).attr('data-weight');
+                var fid = $(this).parent().find('input[name="field_image[und][' + weight + '][fid]"]').val();
+                var rotate_value = parseInt($(this).attr('data-rotate'));
+                //REMOVE EXISTING ROTATE CLASS
+                $(this).parent().siblings('.image-preview').find('img').removeClass('rotate-' + rotate_value);
+                //REMOVE EXISTING HIDDEN ROTATE INPUT
+                $("#field_image_rotate_" + fid).remove();
+
+                if (rotate_value >= 270) {
+                    rotate_value = 0;
+                } else {
+                    rotate_value = rotate_value + 90;
+
+                    $(this).parent().siblings('.image-preview').find('img').addClass('rotate-' + rotate_value);
+                    $(this).parent().append('<input type="hidden" id="field_image_rotate_' + fid + '" name="field_image[und][' + weight + '][rotate]" value="' + rotate_value + '">')
+                }
+                $(this).attr('data-rotate', rotate_value);
+
+
+                return false;
+            });
+        }
+    }
+})(jQuery);

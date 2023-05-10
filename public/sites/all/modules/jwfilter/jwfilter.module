@@ -1,0 +1,102 @@
+<?php
+
+/* Implements hook_filter_info().  */
+
+function jwfilter_filter_info() {
+  $filters = array();
+  $filters['jwfilter'] = array(
+    'title' => t('Embed Movies with JW Player'),
+    'process callback' => 'jwfilter_process_filter',
+    'tips callback' => 'jwfilter_tips',
+    'weight' => 5,
+  );
+  return $filters;
+}
+
+/* Filter tips callback. Display help with using [JWPLAYER] tags */
+
+function jwfilter_tips($filter, $format, $long = FALSE) {
+  if ($long) {
+    return t('
+      <p><strong>JW Player Embed Filter</strong></p>
+      <p>To add a video from the GT Repository, just type the following inline in your body text:</p>
+      <blockquote>
+        <code>[JWPLAYER|<i>ZONE=zoneID</i>|<i>SUBZONE=subzoneID</i>|<i>FILE=filename</i>]</code>
+      </blockquote>
+      <p>Be sure to include the extension of the file, and remember that all parameters are case sensitive!</p>');
+  }
+  else {
+    return check_plain(t('GT Repository videos can be embedded with [JWPLAYER|ZONE=zoneID|SUBZONE=subzoneID|FILE=filename].'));
+  }
+}
+
+/* Filter process callback. Find any [JWPLAYER] tags and convert them to HTML */
+
+function jwfilter_process_filter($text, $filter) { 
+  global $jwfilter_insert_count;
+
+  $jwfilter_insert_count = 0;
+
+  if (stristr(strtoupper($text), '[JWPLAYER') !== FALSE) {
+    $text = "     <script type='text/javascript' src='http://play.media.gatech.edu/prod/jwplayer6/jwplayer.js'></script>\n" .
+            "     <script type='text/javascript' src='http://play.media.gatech.edu/prod/jwplayer6/jwplayerLK.js'></script>\n" . $text;
+    $text = preg_replace_callback("/\[JWPLAYER\|([^\]]+)\]/i", '_jwfilter_replace', $text);
+  }
+  return $text;
+}
+
+/* Callback for preg_replace_callback() in jwfilter_process_filter(). */
+
+function _jwfilter_replace($results) {
+  global $jwfilter_insert_count;
+
+  $width = 720; $height = 500;
+  $zoneID = $subzoneID = $filename = '';
+
+  $params = explode('|', $results[1]);
+  while ($param = array_shift($params)) {
+    $parts = explode('=', $param);
+    switch(strtoupper($parts[0])) {
+      case 'ZONE':
+        $zoneID = $parts[1];
+        break;
+      case 'SUBZONE':
+        $subzoneID = $parts[1];
+        break;
+      case 'FILE':
+        $filename = $parts[1];
+        break;
+      case 'WIDTH':
+        $width = $parts[1];
+        break;
+      case 'HEIGHT':
+        $height = $parts[1]; 
+        break;
+    }
+  }
+
+  if (($zoneID != '') && ($subzoneID != '') && ($filename != '')) {
+  $fileString = $zoneID . '/' . $subzoneID . '/' . $filename;
+
+    $buffer = "    <style><!-- #jwp_video_container" . $jwfilter_insert_count . " { height: 100% !important; } --></style>\n";
+    $buffer .= "    <div id='jwp_video_container" . $jwfilter_insert_count . "'>Loading the player ...</div>\n";
+    $buffer .= "      <script type='text/javascript'>\n";
+    $buffer .= "          jwplayer(\"jwp_video_container" . $jwfilter_insert_count . "\").setup({ \n";
+    $buffer .= "            autostart: false, controlbar: \"bottom\", width: $width, height: $height,\n";
+    $buffer .= "            image: \"http://play.media.gatech.edu/sp/" . $fileString . ".jpg\",\n";
+    $buffer .= "            sources: [\n";
+    $buffer .= "              { file: \"rtmp://wow.media.gatech.edu/vod/mp4:public/buzzbox/" . $fileString . "\" },\n";
+    $buffer .= "              { file: \"http://wow.media.gatech.edu:1935/vod/_definst_/public/buzzbox/" . $fileString . "/playlist.m3u8\" },\n";
+    $buffer .= "            ]\n";
+    $buffer .= "          });\n";
+    $buffer .= "      </script>\n";
+  
+    $jwfilter_insert_count++;
+  
+    return $buffer;
+
+  } else {
+    return "<b>INVALID VIDEO EMBED STRING</b>";
+
+  }
+}

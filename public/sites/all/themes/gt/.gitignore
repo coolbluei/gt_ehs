@@ -1,0 +1,9 @@
+# IDE and OS stuff
+.idea
+nbproject
+config.codekit
+config.rb
+.DS_Store
+
+# Sass caches
+.sass-cache

@@ -1,0 +1,21 @@
+GT Super Block 7.x-2.9, 2017-06-07
+----------------------------------
+-Fix "mymodule" error
+-Fix padding on superblock titles in CSS
+-Add revisioning and nodeblock module variables
+-Update module version to match recommended minimum GT Theme version
+-Fix incomplete uninstall (will now remove all content and content types)
+-Update required and recommended module dependencies
+--Add override_node_options as a recommended module
+--Change these modules from required to recommended:
+---inline_entity_form
+---linkit
+---pathologic
+---revisioning
+
+GT Super Block 7.x-1.1-beta2, 2014-12-17
+----------------------------------
+- Added CHANGELOG.txt file
+- Added project config to .info file for update maintenance
+- Fixed strict warning error about variables being passed by reference when images are used
+- Fixed link issue with titles and images (converted to using Drupal "l" function)
